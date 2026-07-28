@@ -1,12 +1,30 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
-const Database = window.__TAURI_PLUGIN_SQL__;
 
-const db = await Database.load('sqlite:showflow.db');
-
+let shows = null;
 const btnAddShow = document.getElementById("createShowBtn");
-await db.execute('PRAGMA journal_mode = WAL;');
-await db.execute('PRAGMA busy_timeout = 5000;');
+
+function addShowItem(id, name, time){
+  const item = generateDynamic([
+    {type: "tr", varId: "row"},
+    {type: "td", text: name, target: "@row"},
+    {type: "td", text: time, target: "@row"},
+    {type: "td", varId: "action-container", target: "@row"},
+    {type: "div", classes: "actions-cell", target: "@action-container", varId: "action-cell"},
+    { type: "button", text: "Edit", classes: ["btn-action", "btn-outline-muted"], target: "@action-cell", varId: "editBtn"},
+    { type: "button", text: "Start", classes: ["btn-action", "btn-outline-primary"], target: "@action-cell"},
+    { type: "button", text: "Remove", classes: ["btn-action", "btn-outline-danger"], target: "@action-cell", varId: "delBtn" }
+  ], "#editShowsTableBody");
+
+  item.delBtn.addEventListener("click", async () => {
+    await invoke("delete_show", {id});
+    item.row.remove();
+  });
+
+  item.editBtn.addEventListener("click", async () => {
+    console.log(`edit ${id}`);
+  });
+}
 
 btnAddShow.addEventListener("click", async () => {
   const newShowData = await dynamicPrompt({
@@ -20,25 +38,15 @@ btnAddShow.addEventListener("click", async () => {
     ]
   });
 
-  await db.execute('INSERT INTO show (show_name, show_time) VALUES ($1, $2)', [newShowData.newShowName, newShowData.newShowTime]);
+  const newShowId = await invoke('new_show', {name: newShowData.newShowName, time: newShowData.newShowTime});
 
-  generateDynamic([
-    {type: "tr", varId: "row"},
-    {type: "td", text: newShowData.newShowName, target: "@row"},
-    {type: "td", text: newShowData.newShowTime, target: "@row"},
-    {type: "td", children: [
-        {type: "div", classes: "actions-cell", children: [
-            { type: "button", text: "Edit", classes: ["btn-action", "btn-outline-muted"] },
-            { type: "button", text: "Start", classes: ["btn-action", "btn-outline-primary"] },
-            { type: "button", text: "Remove", classes: ["btn-action", "btn-outline-danger"] }
-        ]}
-    ], target: "@row"}
-  ], "#editShowsTableBody");
+  shows.push({id: newShowId, name: newShowData.newShowName, time: newShowData.newShowTime});
+  addShowItem(newShowId, newShowData.newShowName, newShowData.newShowTime);
 });
 
-const init = async () => {
-    const currentContent = await db.execute("SELECT * FROM show");
-    console.log(currentContent);
+async function init(){
+  shows = await invoke("get_shows");
+  shows.forEach(show => addShowItem(show.id, show.name, show.time));
 }
 
-init()
+init();

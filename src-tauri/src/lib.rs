@@ -1,54 +1,94 @@
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State};
 use rusqlite::Connection;
+use tauri::State;
+use tauri::Manager;
+use serde::Serialize;
 
 pub struct DbState(pub Mutex<Connection>);
 
-fn init_shared_db(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    // 1. Get the official app data directory
-    let mut db_path = app.path().app_data_dir()?;
-    std::fs::create_dir_all(&db_path)?;
-    db_path.push("showflow.db");
+#[derive(Serialize)]
+pub struct Show {
+    pub id: i64,
+    pub name: String,
+    pub time: String,
+}
 
-    // 2. Open connection in Rust
-    let conn = Connection::open(&db_path)?;
-
-    // 3. IMPORTANT: Enable WAL Mode & set a busy timeout for concurrency
-    conn.pragma_update(None, "journal_mode", "WAL")?;
-    conn.pragma_update(None, "busy_timeout", "5000")?; // Waits up to 5s if locked instead of failing immediately
-
-    // 4. Create base tables if they don't exist
+fn init_db() -> Result<Connection, String> {
+    let conn = Connection::open("shows.db").map_err(|e| e.to_string())?;
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS show (
-            show_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            show_name TEXT NOT NULL,
-            show_time TEXT NOT NULL,
-            show_status TEXT DEFAULT 'idle'
+        "CREATE TABLE IF NOT EXISTS shows (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            time TEXT NOT NULL
         )",
         [],
-    )?;
-
-    app.manage(DbState(Mutex::new(conn)));
-    Ok(())
+    ).map_err(|e| e.to_string())?;
+    Ok(conn)
 }
 
 #[tauri::command]
-fn new_show(name: &str, time: &str) -> String {
-    println!("{}", format!("New show created: {} at {}", name, time));
-    format!("New show created: {} at {}", name, time)
+fn new_show(state: State<'_, DbState>, name: &str, time: &str) -> Result<Show, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "INSERT INTO shows (name, time) VALUES (?1, ?2)",
+        &[name, time],
+    ).map_err(|e| e.to_string())?;
+
+    let id = conn.last_insert_rowid();
+
+    let show = Show {
+        id,
+        name: name.to_string(),
+        time: time.to_string(),
+    };
+    println!("New show created: {} at {}", show.name, show.time);
+    Ok(show)
+}
+
+#[tauri::command]
+fn get_shows(state: State<'_, DbState>) -> Result<Vec<Show>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;  
+    let mut stmt = conn.prepare("SELECT id, name, time FROM shows").map_err(|e| e.to_string())?;
+    let show_iter = stmt.query_map([], |row| {
+        Ok(Show {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            time: row.get(2)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut shows = Vec::new();
+    for show in show_iter {
+        shows.push(show.map_err(|e| e.to_string())?);
+    }
+    Ok(shows)
+}
+
+#[tauri::command]
+fn delete_show(state: State<'_, DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM shows WHERE id = ?1",
+        &[&id],
+    ).map_err(|e| e.to_string())?;
+    println!("Show with ID {} deleted", id);
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_sql::Builder::default().build())
         .setup(|app| {
-            init_shared_db(app)?;
+            let conn = init_db().expect("Failed to initialize database");
+            app.manage(DbState(Mutex::new(conn)));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            new_show
+            new_show,
+            get_shows,
+            delete_show
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

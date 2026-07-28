@@ -102,6 +102,8 @@ const generateDynamic = ( definition, location = document.body ) => {
         const elem = dynamicGenerator( item, target );
         if( item.varId !== undefined ) ids[ item.varId ] = elem;
     } );
+
+    return ids;
 }
 
 const dynamicPrompt = ( { title, elements, confirmText = "Save", cancelText = "Cancel", onConfirm, onCancel, onValidate = null } ) => {
