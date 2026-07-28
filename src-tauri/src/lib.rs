@@ -4,7 +4,6 @@ use std::sync::Mutex;
 use tauri::State;
 use tauri::Manager;
 use tauri_plugin_opener;
-use rusqlite::OptionalExtension;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -34,11 +33,10 @@ pub struct ScenarioLineComment {
 pub struct ScenarioLine {
     pub id: i64,
     pub show_id: i64,
-    pub line_number: i64,
-    pub content: String,
+    pub order: i64,
+    pub name: String,
 }
 
-// Master struct sent over to JS
 #[derive(Serialize)]
 pub struct ShowDetails {
     pub show: Show,
@@ -141,8 +139,8 @@ fn get_full_show_details(state: State<'_, db::DbState>, show_id: i64) -> Result<
             Ok(ScenarioLine {
                 id: row.get(0)?,
                 show_id: row.get(1)?,
-                line_number: row.get(2)?,
-                content: row.get(3)?,
+                order: row.get(2)?,
+                name: row.get(3)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -182,6 +180,26 @@ fn get_full_show_details(state: State<'_, db::DbState>, show_id: i64) -> Result<
     })
 }
 
+#[tauri::command]
+fn add_role(state: State<'_, db::DbState>, show_id: i64, role_name: &str) -> Result<ShowRole, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "INSERT INTO show_roles (show_id, role_name) VALUES (?1, ?2)",
+        rusqlite::params![show_id, role_name],
+    ).map_err(|e| e.to_string())?;
+
+    let id = conn.last_insert_rowid();
+
+    let role = ShowRole {
+        id,
+        show_id,
+        name: role_name.to_string(),
+    };
+    println!("New role created: {} for show ID {}", role.name, role.show_id);
+    Ok(role)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -195,7 +213,8 @@ pub fn run() {
             new_show,
             get_shows,
             delete_show,
-            get_full_show_details
+            get_full_show_details,
+            add_role
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

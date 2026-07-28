@@ -1,13 +1,30 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
-const currentBox = null; 
+let currentBox = null;
+let currentShowId = null;
 
 async function openEditShow(id, name){
+    currentShowId = id;
     const showContent = await invoke("get_full_show_details", {showId: id})
     console.log(showContent);
 
-    let content = [{type: "h1", text: "This is the edit box"}];
+    let content = [
+        {type: "button", classes: ["btn", "btn-primary"], text: "Create Role", events: {click: () => addRole()}}
+    ];
 
-    addHoverBox(null, `Edit Show - ${name}`, content, {fullscreen: true})
+    currentBox = addHoverBox(null, `Edit Show - ${name}`, content, {fullscreen: true})
+}
+
+async function addRole(){
+    const newRoleData = await dynamicPrompt({
+        title: "New Role",
+        confirmText: "Create",
+        elements: [
+            {type: "label", attributes: {for: "newRoleName"}, text: "Role name"},
+            {type: "input", attributes: {type: "text"}, id: "newRoleName"},
+        ]
+    });
+
+    await invoke("add_role", {showId: currentShowId, roleName: newRoleData.newRoleName})
 }
