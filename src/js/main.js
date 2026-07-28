@@ -5,10 +5,11 @@ let shows = null;
 const btnAddShow = document.getElementById("createShowBtn");
 
 function addShowItem(id, name, time){
+  const date = new Date(time * 1000);
   const item = generateDynamic([
     {type: "tr", varId: "row"},
     {type: "td", text: name, target: "@row"},
-    {type: "td", text: time, target: "@row"},
+    {type: "td", text: date.toLocaleString(), target: "@row"},
     {type: "td", varId: "action-container", target: "@row"},
     {type: "div", classes: "actions-cell", target: "@action-container", varId: "action-cell"},
     { type: "button", text: "Edit", classes: ["btn-action", "btn-outline-muted"], target: "@action-cell", varId: "editBtn"},
@@ -21,9 +22,7 @@ function addShowItem(id, name, time){
     item.row.remove();
   });
 
-  item.editBtn.addEventListener("click", async () => {
-    console.log(`edit ${id}`);
-  });
+  item.editBtn.addEventListener("click", () => openEditShow(id, name));
 }
 
 btnAddShow.addEventListener("click", async () => {
@@ -38,10 +37,12 @@ btnAddShow.addEventListener("click", async () => {
     ]
   });
 
-  const newShowId = await invoke('new_show', {name: newShowData.newShowName, time: newShowData.newShowTime});
+  const unixTimestamp = Math.floor(new Date(newShowData.newShowTime).getTime() / 1000);
 
-  shows.push({id: newShowId, name: newShowData.newShowName, time: newShowData.newShowTime});
-  addShowItem(newShowId, newShowData.newShowName, newShowData.newShowTime);
+  const newShowId = await invoke('new_show', {name: newShowData.newShowName, time: unixTimestamp});
+
+  shows.push({id: newShowId, name: newShowData.newShowName, time: unixTimestamp});
+  addShowItem(newShowId, newShowData.newShowName, unixTimestamp);
 });
 
 async function init(){

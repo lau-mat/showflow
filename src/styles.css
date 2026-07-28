@@ -292,17 +292,27 @@ td.create-show-cell {
   color: var(--text-main);
 }
 
-.modal-header .close-btn {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  line-height: 1;
-  color: var(--text-muted);
+.modal-header .close-btn,
+.boxTitle .closeBtn {
+  width: 1.5rem;
+  height: 1.5rem;
   cursor: pointer;
 }
 
-.modal-header .close-btn:hover {
-  color: var(--text-main);
+/* Force stroke color on child paths, overriding inline styles */
+.modal-header .close-btn ellipse,
+.modal-header .close-btn path,
+.boxTitle .closeBtn ellipse,
+.boxTitle .closeBtn path {
+  stroke: var(--text-muted) !important;
+  transition: stroke 0.2s ease;
+}
+
+.modal-header .close-btn:hover ellipse,
+.modal-header .close-btn:hover path,
+.boxTitle .closeBtn:hover ellipse,
+.boxTitle .closeBtn:hover path {
+  stroke: var(--text-main) !important;
 }
 
 .modal-content {
@@ -407,6 +417,11 @@ td.create-show-cell {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.boxTitle span {
+  flex: 1;
+  text-align: center;
 }
 
 .closeBtn {

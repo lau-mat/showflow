@@ -1,3 +1,7 @@
+const svgCache = new Map();
+const svgNamespace = "http://www.w3.org/2000/svg"; 
+const validElementTypes = [ 'svg', 'code', 'li', 'strong', 'small', 'pre', 'textarea', 'nav', 'section', 'a', 'i', 'div', 'span', 'p', 'br', 'button', 'h1', 'h2', 'h3', 'input', 'img', 'label', "table", "thead", "tbody", "select", "option", "tr", "td", "th" ];
+
 function resolveElement(elem){
     if(elem instanceof HTMLElement)
         return elem
@@ -7,25 +11,79 @@ function resolveElement(elem){
 
 const dynamicGenerator = ( definition, location = document.body ) => {
     // Validate element type
-    if (!definition.type || typeof definition.type !== "string") {
-        console.error( "Invalid element type:", definition );
-        return;
-    }
+    if (!definition.type || typeof definition.type !== "string") return console.error( "Invalid element type:", definition );
+    if (!validElementTypes.includes(definition.type)) return console.error("Unsupported element type:", definition.type);
 
-    location = resolveElement(location)
+    location = resolveElement(location);
 
-    const validElementTypes = [ 'code', 'li', 'strong', 'small', 'pre', 'textarea', 'nav', 'section', 'a', 'i', 'div', 'span', 'p', 'br', 'button', 'h1', 'h2', 'h3', 'input', 'img', 'label', "table", "thead", "tbody", "select", "option", "tr", "td", "th" ];
-    if (!validElementTypes.includes(definition.type)) {
-        console.error("Unsupported element type:", definition.type);
-        return;
-    }
+    let item = null;
 
-    const item = document.createElement(definition.type);
+    switch( definition.type ){
+        case "svg":
+            if( !definition.file ) return console.error( "trying to add svg witouth file reference" );
 
-    if (definition.text !== undefined) {
-        item.innerText = definition.text;
-    } else if (definition.html !== undefined) {
-        item.innerHTML = definition.html;
+            if( !svgCache.has( definition.file ) ){
+                const request = new XMLHttpRequest();
+                request.open( "GET", definition.file, false );
+                request.send( null );
+
+                if( request.status === 200 && request.responseText.toLocaleLowerCase().includes("<?xml version") ){
+                    svgCache.set( definition.file, request.responseText );
+                } else {
+                    throw new Error( `Failed to request SVG file, ${definition.file}` );
+                }
+            }
+
+            const svgContent = svgCache.get( definition.file );
+
+            item = document.createElementNS( svgNamespace, definition.type );
+
+            const parser = new DOMParser();
+            const svgDoc = parser.parseFromString( svgContent, "image/svg+xml" );
+            const loadedSvg = svgDoc.documentElement;
+
+            if( loadedSvg.getAttribute( "viewBox" ) ){
+                item.setAttribute( "viewBox", loadedSvg.getAttribute( "viewBox" ) );
+            }
+
+            let generalStyle = new Map();
+            let specificStyling = new Map();
+
+            if( typeof definition.pathStyle === "object" ) {
+                for( const key in definition.pathStyle ){
+                    if( typeof definition.pathStyle[ key ] === "object" ){
+                        specificStyling.set( key, definition.pathStyle[ key ] );
+                    } else {
+                        generalStyle.set( key, definition.pathStyle[ key ] );
+                    }
+                }
+            }
+
+            const toKebabCase = str => str.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+
+            const allElements = loadedSvg.querySelectorAll("*");
+            allElements.forEach( elem => {
+                const finalStyle = Object.fromEntries( generalStyle );
+
+                specificStyling.forEach( ( styles, selector ) => {
+                    if( elem.matches( selector ) ) Object.assign( finalStyle, styles );
+                } );
+
+                for( const prop in finalStyle ) elem.style[ toKebabCase( prop ) ] = finalStyle[ prop ];
+            } );
+
+            while( loadedSvg.firstChild ) item.appendChild( loadedSvg.firstChild );
+
+            break;
+
+        default:
+            item = document.createElement(definition.type);
+
+            if (definition.text !== undefined) {
+                item.innerText = definition.text;
+            } else if (definition.html !== undefined) {
+                item.innerHTML = definition.html;
+            }
     }
 
     // Add classes if provided
@@ -75,8 +133,8 @@ const dynamicGenerator = ( definition, location = document.body ) => {
     if( definition.children !== undefined && Array.isArray( definition.children ) ){
         definition.children.forEach( child => dynamicGenerator( child, item ) );
     }
-    
-    location.append( item );
+
+    location.append(item);
     return item;
 }
 
@@ -179,13 +237,7 @@ const dynamicPrompt = ( { title, elements, confirmText = "Save", cancelText = "C
             
             { type: "div", classes: "modal-header", varId: "modalHeader", target: "@modalBox" },
             { type: "h2", text: title, target: "@modalHeader" },
-            { 
-                type: "button", 
-                classes: "close-btn", 
-                html: "&times;",
-                target: "@modalHeader",
-                events: { click: closeModal }
-            },
+            { type: "svg", file: "icons/close.svg", classes: "close-btn", events: { click: closeModal }, target: "@modalHeader" },
             
             { type: "div", classes: "modal-content", varId: "modalContent", target: "@modalBox" },
             
