@@ -32,9 +32,11 @@ pub struct ScenarioLineComment {
 #[derive(Serialize)]
 pub struct ScenarioLine {
     pub id: i64,
-    pub show_id: i64,
     pub order: i64,
     pub name: String,
+    pub comment: String,
+    pub time: String,
+    pub time_mode: i64
 }
 
 #[derive(Serialize)]
@@ -131,16 +133,18 @@ fn get_full_show_details(state: State<'_, db::DbState>, show_id: i64) -> Result<
 
     // 3. Fetch Scenario Lines for this show
     let mut lines_stmt = conn
-        .prepare("SELECT scenario_line_id, show_id, scenario_line_order, scenario_line_name FROM show_scenario_line WHERE show_id = ?1 ORDER BY scenario_line_order ASC")
+        .prepare("SELECT scenario_line_id, scenario_line_order, scenario_line_name, scenario_line_note, scenario_line_time, scenario_line_time_mode FROM show_scenario_line WHERE show_id = ?1 ORDER BY scenario_line_order ASC")
         .map_err(|e| e.to_string())?;
 
     let lines = lines_stmt
         .query_map([show_id], |row| {
             Ok(ScenarioLine {
                 id: row.get(0)?,
-                show_id: row.get(1)?,
-                order: row.get(2)?,
-                name: row.get(3)?,
+                order: row.get(1)?,
+                name: row.get(2)?,
+                comment: row.get(3)?,
+                time: row.get(4)?,
+                time_mode: row.get(5)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -200,6 +204,29 @@ fn add_role(state: State<'_, db::DbState>, show_id: i64, role_name: &str) -> Res
     Ok(role)
 }
 
+#[tauri::command]
+fn add_scenario_line(state: State<'_, db::DbState>, show_id: i64, line_order: i64, line_name: &str, line_comment: &str, line_time: &str, line_time_mode: i64) -> Result<ScenarioLine, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "INSERT INTO show_scenario_line (show_id, scenario_line_order, scenario_line_name, scenario_line_note, scenario_line_time, scenario_line_time_mode) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![show_id, line_order, line_name, line_comment, line_time, line_time_mode],
+    ).map_err(|e| e.to_string())?;
+
+    let line_id = conn.last_insert_rowid();
+
+    let scenario_line = ScenarioLine {
+        id: line_id,
+        order: line_order,
+        name: line_name.to_string(),
+        comment: line_comment.to_string(),
+        time: line_time.to_string(),
+        time_mode: line_time_mode,
+    };
+    println!("New scenario line created: {} for show ID {}", scenario_line.name, show_id);
+    Ok(scenario_line)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -214,7 +241,8 @@ pub fn run() {
             get_shows,
             delete_show,
             get_full_show_details,
-            add_role
+            add_role,
+            add_scenario_line
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -13,7 +13,7 @@ fn get_migrations() -> Migrations<'static> {
                 show_time INTEGER NOT NULL,
                 show_status INTEGER default 0
             );
-            
+
             CREATE TABLE show_roles (
                 role_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 show_id INTEGER NOT NULL,
@@ -27,7 +27,8 @@ fn get_migrations() -> Migrations<'static> {
                 scenario_line_order INTEGER NOT NULL,
                 scenario_line_name TEXT NOT NULL,
                 scenario_line_note TEXT NOT NULL,
-                scenario_line_color TEXT NOT NULL,
+                scenario_line_time INTEGER NOT NULL,
+                scenario_line_time_mode INTEGER NOT NULL DEFAULT 0,
                 FOREIGN KEY(show_id) REFERENCES shows(show_id) ON DELETE CASCADE
             );
 

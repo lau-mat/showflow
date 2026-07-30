@@ -12,9 +12,9 @@ function addShowItem(id, name, time){
     {type: "td", text: date.toLocaleString(), target: "@row"},
     {type: "td", varId: "action-container", target: "@row"},
     {type: "div", classes: "actions-cell", target: "@action-container", varId: "action-cell"},
-    { type: "button", text: "Edit", classes: ["btn-action", "btn-outline-muted"], target: "@action-cell", varId: "editBtn"},
-    { type: "button", text: "Start", classes: ["btn-action", "btn-outline-primary"], target: "@action-cell"},
-    { type: "button", text: "Remove", classes: ["btn-action", "btn-outline-danger"], target: "@action-cell", varId: "delBtn" }
+    {type: "svg", file: "icons/edit.svg", classes: ["btn-icon", "btn-icon-muted"], target: "@action-cell", varId: "editBtn"},
+    {type: "svg", file: "icons/start.svg", classes: ["btn-icon", "btn-icon-muted"], target: "@action-cell"},
+    {type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-icon-danger"], target: "@action-cell", varId: "delBtn" }
   ], "#editShowsTableBody");
 
   item.delBtn.addEventListener("click", async () => {
