@@ -6,12 +6,63 @@ const validElementTypes = [
   'img', 'label', "table", "thead", "tbody", "select", "option", "tr", "td", "th", "aside", "ul"
 ];
 
+const compoundComponents = {
+    "input-label": [
+        { type: "label", attributes: { for: "&id" }, text: "&label" },
+        { type: "input", attributes: { type: "text", placeholder: "&placeholder" }, id: "&id" }
+    ],
+    "select-label": [
+        { type: "label", attributes: { for: "&id" }, text: "&label" },
+        { type: "select", id: "&id", children: "&options" }
+    ],
+    "textarea-label": [
+        { type: "label", attributes: { for: "&id" }, text: "&label" },
+        { type: "textarea", attributes: { rows: "&rows", placeholder: "&placeholder" }, id: "&id" }
+    ]
+};
+
 function resolveElement(elem) {
     if (elem instanceof HTMLElement) return elem;
     return document.querySelector(elem);
 }
 
+function interpolateTemplate(template, props) {
+    if (typeof template === "string") {
+        if (template.startsWith("&")) {
+            const key = template.slice(1);
+            return props[key] !== undefined ? props[key] : "";
+        }
+        return template;
+    }
+
+    if (Array.isArray(template)) {
+        return template.map(item => interpolateTemplate(item, props));
+    }
+
+    if (typeof template === "object" && template !== null) {
+        const result = {};
+        for (const [key, value] of Object.entries(template)) {
+            result[key] = interpolateTemplate(value, props);
+        }
+        return result;
+    }
+
+    return template;
+}
+
 const dynamicGenerator = ( definition, location = document.body ) => {
+    if (definition.type && compoundComponents[definition.type]) {
+        const template = compoundComponents[definition.type];
+        const interpolatedElements = interpolateTemplate(template, definition);
+        const groupContainer = dynamicGenerator({
+            type: "div",
+            classes: ["form-group", ...(definition.classes ? [definition.classes].flat() : [])]
+        }, location);
+
+        interpolatedElements.forEach(childDef => dynamicGenerator(childDef, groupContainer));
+        return groupContainer;
+    }
+
     if (!definition.type || typeof definition.type !== "string") return console.error("Invalid element type:", definition);
     if (!validElementTypes.includes(definition.type)) return console.error("Unsupported element type:", definition.type);
 
@@ -27,10 +78,11 @@ const dynamicGenerator = ( definition, location = document.body ) => {
                 request.open("GET", definition.file, false);
                 request.send(null);
 
-                if(request.status !== 200 || !request.responseText.toLowerCase().includes("<?xml version"))
+                if(request.status === 200 && request.responseText.toLowerCase().includes("<?xml version")) {
+                    svgCache.set(definition.file, request.responseText);
+                } else {
                     throw new Error(`Failed to request SVG file, ${definition.file}`);
-                
-                svgCache.set(definition.file, request.responseText);
+                }
             }
 
             const svgContent = svgCache.get(definition.file);
@@ -89,7 +141,12 @@ const dynamicGenerator = ( definition, location = document.body ) => {
     }
 
     if (typeof definition.attributes === "object") {
-        for (const attribute in definition.attributes) item.setAttribute(attribute, definition.attributes[attribute]);
+        for (const attribute in definition.attributes) {
+            // Strip out empty attributes resulting from optional template parameters
+            if (definition.attributes[attribute] !== "" && definition.attributes[attribute] !== undefined) {
+                item.setAttribute(attribute, definition.attributes[attribute]);
+            }
+        }
     }
     if(typeof definition.style === "object")
         for(const style in definition.style) item.style[style] = definition.style[style];
@@ -99,8 +156,9 @@ const dynamicGenerator = ( definition, location = document.body ) => {
 
     if (definition.id !== undefined && typeof definition.id === "string") item.id = definition.id;
 
-    if(definition.data !== undefined && typeof definition.data === "object")
+    if(definition.data !== undefined && typeof definition.data === "object") {
         Object.keys(definition.data).forEach(tag => item.dataset[tag] = definition.data[tag]);
+    }
 
     if(Array.isArray(definition.events)) {
         definition.events.forEach(event => {
@@ -112,8 +170,9 @@ const dynamicGenerator = ( definition, location = document.body ) => {
         for(const event in definition.events) item.addEventListener(event, definition.events[event].bind(this));
     }
 
-    if(definition.children !== undefined && Array.isArray(definition.children))
+    if(definition.children !== undefined && Array.isArray(definition.children)) {
         definition.children.forEach(child => dynamicGenerator(child, item));
+    }
 
     location.append(item);
     return item;

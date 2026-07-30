@@ -30,8 +30,7 @@ btnAddShow.addEventListener("click", async () => {
     title: "New Show Details",
     confirmText: "Create",
     elements: [
-        {type: "label", attributes: {for: "newShowName"}, text: "Show name"},
-        {type: "input", attributes: {type: "text"}, id: "newShowName"},
+        {type: "input-label", id: "newShowName", label: "Show name"},
         {type: "label", attributes: {for: "newShowTime"}, text: "Show time"},
         {type: "input", attributes: {type: "datetime-local"}, id: "newShowTime"}
     ]

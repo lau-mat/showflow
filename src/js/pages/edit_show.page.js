@@ -193,8 +193,7 @@ async function addRole() {
         title: "New Role",
         confirmText: "Create",
         elements: [
-            { type: "label", attributes: { for: "newRoleName" }, text: "Role name" },
-            { type: "input", attributes: { type: "text", placeholder: "e.g., Audio Tech, Stage Manager" }, id: "newRoleName" },
+            {type: "input-label", id: "newRoleName", label: "Role name"}
         ]
     });
 
@@ -220,39 +219,24 @@ async function addLine() {
                         type: "div",
                         classes: "form-group",
                         children: [
-                            { type: "label", attributes: { for: "timeReference" }, text: "Time Mode" },
-                            {
-                                type: "select",
-                                id: "timeReference",
-                                children: [
-                                    { type: "option", attributes: { value: "relative" }, text: "Relative (+00:00)" },
-                                    { type: "option", attributes: { value: "absolute" }, text: "Absolute (Clock)" }
-                                ]
-                            }
+                            {type: "select-label", label: "Time Mode", id: "timeReference", options: [
+                                { type: "option", attributes: { value: "relative" }, text: "Relative (+00:00)" },
+                                { type: "option", attributes: { value: "absolute" }, text: "Absolute (Clock)" }
+                            ]}
                         ]
                     },
                     {
                         type: "div",
                         classes: "form-group",
                         children: [
-                            { type: "label", attributes: { for: "timeValue" }, text: "Time / Offset" },
-                            { 
-                                type: "input", 
-                                attributes: { type: "text", placeholder: "e.g., +05:00 or 20:15" }, 
-                                id: "timeValue" 
-                            }
+                            {type: "input-label", id: "timeValue", label: "Time / Offset", placeholder: "e.g., +05:00 or 20:15"}
                         ]
                     }
                 ]
             },
 
-            // Line Name Input
-            { type: "label", attributes: { for: "lineName" }, text: "Line Name" },
-            { type: "input", attributes: { type: "text", placeholder: "e.g., Intro Cue" }, id: "lineName" },
-
-            // Cue Description Input
-            { type: "label", attributes: { for: "lineContent" }, text: "Cue Description / Script Line" },
-            { type: "textarea", attributes: { rows: "3", placeholder: "Enter cue description..." }, id: "lineContent" }
+            {type: "input-label", id: "lineName", label: "Line Name", placeholder: "e.g., Intro Cue"},
+            {type: "textarea-label", id: "lineContent", label: "Cue Description / Script Line", placeholder: "Enter cue description...", rows: 3}
         ]
     });
 
@@ -283,10 +267,8 @@ async function addComment(lineId) {
         title: "Add Note / Comment",
         confirmText: "Save Note",
         elements: [
-            { type: "label", attributes: { for: "roleId" }, text: "Assign to Role" },
-            { type: "select", id: "roleId", children: roleOptions },
-            { type: "label", attributes: { for: "commentText" }, text: "Comment" },
-            { type: "textarea", attributes: { rows: "2" }, id: "commentText" }
+            {type: "select-label", id: "roleId", label: "Assign to Role", options: roleOptions},
+            {type: "textarea-label", id: "commentText", label: "Comment", rows: "2"}
         ]
     });
 
