@@ -25,8 +25,7 @@ pub struct ScenarioLineComment {
     pub id: i64,
     pub line_id: i64,
     pub role_id: Option<i64>, // Nullable foreign key
-    pub comment: String,
-    pub created_at: String,
+    pub comment: String
 }
 
 #[derive(Serialize)]
@@ -154,7 +153,7 @@ fn get_full_show_details(state: State<'_, db::DbState>, show_id: i64) -> Result<
     // 4. Fetch Comments for lines in this show
     let mut comments_stmt = conn
         .prepare(
-            "SELECT c.id, c.line_id, c.role_id, c.comment, c.created_at 
+            "SELECT c.id, c.line_id, c.role_id, c.comment 
              FROM show_scenario_line_comment c
              JOIN show_scenario_line l ON c.line_id = l.scenario_line_id
              WHERE l.show_id = ?1"
@@ -167,8 +166,7 @@ fn get_full_show_details(state: State<'_, db::DbState>, show_id: i64) -> Result<
                 id: row.get(0)?,
                 line_id: row.get(1)?,
                 role_id: row.get(2)?,
-                comment: row.get(3)?,
-                created_at: row.get(4)?,
+                comment: row.get(3)?
             })
         })
         .map_err(|e| e.to_string())?
@@ -227,6 +225,38 @@ fn add_scenario_line(state: State<'_, db::DbState>, show_id: i64, line_order: i6
     Ok(scenario_line)
 }
 
+#[tauri::command]
+fn delete_scenario_line(state: State<'_, db::DbState>, line_id: i64) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM show_scenario_line WHERE scenario_line_id = ?1",
+        rusqlite::params![line_id],
+    ).map_err(|e| e.to_string())?;
+    println!("Scenario line with ID {} deleted", line_id);
+    Ok(())
+}
+
+#[tauri::command]
+fn add_scenario_line_comment(state: State<'_, db::DbState>, line_id: i64, role_id: Option<i64>, comment: &str) -> Result<ScenarioLineComment, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "INSERT INTO show_scenario_line_comment (line_id, role_id, comment) VALUES (?1, ?2, ?3)",
+        rusqlite::params![line_id, role_id, comment],
+    ).map_err(|e| e.to_string())?;
+
+    let comment_id = conn.last_insert_rowid();
+
+    let scenario_line_comment = ScenarioLineComment {
+        id: comment_id,
+        line_id,
+        role_id,
+        comment: comment.to_string()
+    };
+    println!("New comment added to line ID {}: {}", line_id, scenario_line_comment.comment);
+    Ok(scenario_line_comment)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -242,7 +272,9 @@ pub fn run() {
             delete_show,
             get_full_show_details,
             add_role,
-            add_scenario_line
+            add_scenario_line,
+            delete_scenario_line,
+            add_scenario_line_comment
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

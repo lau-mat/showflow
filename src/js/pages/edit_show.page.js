@@ -36,7 +36,6 @@ function buildEditShowLayout(data) {
             type: "div",
             classes: "show-editor-container",
             children: [
-                // --- SIDEBAR: Show Meta & Roles ---
                 {
                     type: "aside",
                     classes: "show-editor-sidebar",
@@ -47,7 +46,7 @@ function buildEditShowLayout(data) {
                             classes: "editor-card",
                             children: [
                                 { type: "h3", text: "Show Details" },
-                                { type: "p", classes: "show-meta-time", text: `📅 ${formattedDate}` }
+                                { type: "p", classes: "show-meta-time", text: formattedDate }
                             ]
                         },
                         // Roles Card
@@ -61,9 +60,9 @@ function buildEditShowLayout(data) {
                                     children: [
                                         { type: "h3", text: "Roles" },
                                         { 
-                                            type: "button", 
-                                            classes: ["btn", "btn-action", "btn-outline-primary"], 
-                                            text: "+ Add Role",
+                                            type: "svg", 
+                                            classes: ["btn-icon", "btn-outline-primary"], 
+                                            file: "icons/add.svg",
                                             events: { click: addRole }
                                         }
                                     ]
@@ -93,9 +92,9 @@ function buildEditShowLayout(data) {
                             children: [
                                 { type: "h3", text: "Run Sheet & Scenario Lines" },
                                 { 
-                                    type: "button", 
-                                    classes: ["btn", "btn-primary"], 
-                                    text: "+ Add Line",
+                                    type: "svg", 
+                                    classes: ["btn-icon", "btn-outline-primary"], 
+                                    file: "icons/add.svg",
                                     events: { click: addLine }
                                 }
                             ]
@@ -113,9 +112,10 @@ function buildEditShowLayout(data) {
                                             children: [{
                                                 type: "tr",
                                                 children: [
-                                                    { type: "th", text: "#", style: { width: "60px" } },
-                                                    { type: "th", text: "Cue / Line Content" },
-                                                    { type: "th", text: "Notes & Comments" },
+                                                    { type: "th", text: "time", style: { width: "60px" } },
+                                                    { type: "th", text: "Cue" },
+                                                    { type: "th", text: "Note" },
+                                                    { type: "th", text: "Comments" },
                                                     { type: "th", text: "Actions", style: { width: "100px", textAlign: "right" } }
                                                 ]
                                             }]
@@ -148,12 +148,15 @@ function buildEditShowLayout(data) {
  */
 function buildLineRow(line, allComments, allRoles) {
     const lineComments = allComments.filter(c => c.line_id === line.id);
+    console.log(line);
 
     return {
         type: "tr",
+        data: {id: line.id},
         children: [
-            { type: "td", classes: "line-number-cell", text: `#${line.line_number}` },
-            { type: "td", classes: "line-content-cell", text: line.content },
+            { type: "td", classes: "line-number-cell", text: line.time_mode == 1 ? line.time : `+${line.time}` },
+            { type: "td", classes: "line-content-cell", text: line.name },
+            { type: "td", classes: "line-note-cell", text: line.comment },
             {
                 type: "td",
                 classes: "line-comments-cell",
@@ -181,7 +184,7 @@ function buildLineRow(line, allComments, allRoles) {
                 type: "td",
                 style: { textAlign: "right" },
                 children: [
-                    {type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-icon-danger"], events: { click: () => deleteLine(line.id) } }
+                    {type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-danger"], events: { click: () => deleteLine(line.id) } }
                 ]
             }
         ]
@@ -280,4 +283,11 @@ async function addComment(lineId) {
         comment: commentData.commentText
     });
     await refreshShowData();
+}
+
+async function deleteLine(id){
+    await invoke("delete_scenario_line", {lineId: id});
+
+    const line = document.querySelector(`.lines-table tr[data-id='${id}']`);
+    line.remove();
 }

@@ -15,12 +15,12 @@
      id="layer1"
      transform="translate(-0.77266359,-1.6057744)">
     <path
-       style="opacity:1;fill:none;stroke:#ffffff;stroke-width:2.99737;stroke-linejoin:round;stroke-miterlimit:39.9;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers"
-       d="M 1.5792546,2.3505022 38.108245,37.336996"
+       style="opacity:1;fill:none;stroke:#ffffff;stroke-width:2.26119;stroke-linejoin:round;stroke-miterlimit:39.9;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers"
+       d="m 0.77266359,19.835049 38.14217241,0.0174"
        id="path2" />
     <path
-       style="fill:none;stroke:#ffffff;stroke-width:3.03937;stroke-linejoin:round;stroke-miterlimit:39.9;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers"
-       d="M 37.992389,2.5311547 1.6951106,37.156343"
+       style="fill:none;stroke:#ffffff;stroke-width:2.21125;stroke-linejoin:round;stroke-miterlimit:39.9;stroke-dasharray:none;stroke-opacity:1;paint-order:stroke fill markers"
+       d="m 19.853198,1.6057744 -0.0189,36.4759516"
        id="path2-3" />
   </g>
 </svg>
