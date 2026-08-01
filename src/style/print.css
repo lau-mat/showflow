@@ -1,0 +1,58 @@
+/* ==========================================================================
+   Print & PDF Generation Rules
+   ========================================================================== */
+
+/* Hide everything in the main app when printing */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  /* Only show the dedicated print container and its children */
+  #print-container, #print-container * {
+    visibility: visible;
+  }
+
+  #print-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    color: #000 !important;
+    background: #fff !important;
+  }
+
+  /* Force background colors/borders to print cleanly */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Page setup & breaks */
+  @page {
+    size: A4 portrait; /* or landscape */
+    margin: 12mm;
+  }
+
+  /* Avoid splitting table rows or comments across page breaks */
+  tr, .print-comment-item {
+    page-break-inside: avoid;
+  }
+
+  .print-header {
+    border-bottom: 2px solid #000;
+    margin-bottom: 15px;
+    padding-bottom: 5px;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .print-table th, .print-table td {
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+    font-size: 11pt;
+  }
+}

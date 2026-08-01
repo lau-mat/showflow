@@ -629,6 +629,7 @@ td.create-show-cell {
 .lines-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .lines-table th {
@@ -636,6 +637,13 @@ td.create-show-cell {
   top: 0;
   background-color: var(--header-bg);
   z-index: 5;
+}
+
+.lines-table td, 
+.lines-table th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 }
 
 .line-number-cell {
@@ -655,8 +663,10 @@ td.create-show-cell {
 .line-comments-cell {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  vertical-align: top;
+  gap: 0.5rem;
+  max-height: 180px; /* Keeps rows uniform; enables internal scrolling if many comments exist */
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .line-action-cell-wrapper {
@@ -667,24 +677,54 @@ td.create-show-cell {
 }
 
 .comment-bubble {
-  background-color: var(--bg-color);
-  border: 1px solid var(--border-color);
-  padding: 0.4rem 0.6rem;
-  border-radius: calc(var(--radius) - 4px);
-  font-size: 0.825rem;
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column; /* Stack Role Tag on top, Comment Text below */
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.4rem 0.6rem;
+  background-color: var(--card-bg, #1e1e24);
+  border: 1px solid var(--border-color, #2d2d35);
+  border-radius: var(--radius, 6px);
+  width: 100%;
+  box-sizing: border-box;
+  
+  transition: all 0.2s ease-in-out;
+  max-height: 200px;
+  opacity: 1;
+  overflow: hidden;
 }
 
 .comment-role-tag {
-  border: 1px solid var(--accent-color);
-  color: var(--text-main);
   font-size: 0.7rem;
-  font-weight: 700;
-  padding: 0.15rem 0.4rem;
-  border-radius: 3px;
+  font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted, #8a8a93);
+  background: var(--header-bg, #282830);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.comment-body-text {
+  font-size: 0.85rem;
+  color: var(--text-main, #e1e1e6);
+  line-height: 1.35;
+  width: 100%;
+  
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.role-comment-hidden {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  pointer-events: none;
 }
 
 .btn-text-action {
@@ -714,4 +754,65 @@ td.create-show-cell {
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  background-color: var(--header-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+.role-badge-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+/* Visibility Icon Button inside Role Badges */
+.btn-role-toggle {
+  width: 1.3rem;
+  height: 1.3rem;
+  min-width: 1.3rem;
+  min-height: 1.3rem;
+  padding: 0.15rem;
+  opacity: 0.9;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-role-toggle path,
+.btn-role-toggle circle,
+.btn-role-toggle line {
+  stroke: var(--text-muted) !important;
+}
+
+.btn-role-toggle:hover path,
+.btn-role-toggle:hover circle,
+.btn-role-toggle:hover line {
+  stroke: var(--text-main) !important;
+}
+
+/* Hidden State (When toggled off) */
+.btn-role-toggle.is-hidden {
+  opacity: 0.35;
+  filter: grayscale(100%);
+}
+
+.btn-role-toggle.is-hidden path,
+.btn-role-toggle.is-hidden circle,
+.btn-role-toggle.is-hidden line {
+  stroke: var(--text-muted) !important;
+  stroke-dasharray: 2 2; /* Optional visual indicator for hidden */
+}
+
+.header-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem; /* Keeps icons neatly bundled together */
 }

@@ -41,7 +41,7 @@ btnAddShow.addEventListener("click", async () => {
   const newShowId = await invoke('new_show', {name: newShowData.newShowName, time: unixTimestamp});
 
   shows.push({id: newShowId, name: newShowData.newShowName, time: unixTimestamp});
-  addShowItem(newShowId, newShowData.newShowName, unixTimestamp);
+  addShowItem(newShowId.id, newShowData.newShowName, unixTimestamp);
 });
 
 async function init(){
