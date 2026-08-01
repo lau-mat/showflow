@@ -185,6 +185,7 @@ tbody tr:last-child td {
 
 tbody tr {
   transition: background-color 0.15s ease;
+  display: table-row;
 }
 
 tbody tr:hover {
@@ -658,6 +659,13 @@ td.create-show-cell {
   vertical-align: top;
 }
 
+.line-action-cell-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* or center, depending on your layout preference */
+  gap: 0.5rem; /* Controls the exact spacing between all action buttons */
+}
+
 .comment-bubble {
   background-color: var(--bg-color);
   border: 1px solid var(--border-color);
@@ -670,8 +678,8 @@ td.create-show-cell {
 }
 
 .comment-role-tag {
-  background-color: var(--accent-color);
-  color: #ffffff;
+  border: 1px solid var(--accent-color);
+  color: var(--text-main);
   font-size: 0.7rem;
   font-weight: 700;
   padding: 0.15rem 0.4rem;

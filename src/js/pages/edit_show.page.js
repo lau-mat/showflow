@@ -31,116 +31,70 @@ async function refreshShowData() {
 function buildEditShowLayout(data) {
     const formattedDate = new Date(data.show.time * 1000).toLocaleString();
 
-    return [
-        {
-            type: "div",
-            classes: "show-editor-container",
-            children: [
-                {
-                    type: "aside",
-                    classes: "show-editor-sidebar",
-                    children: [
-                        // Show Overview Card
-                        {
-                            type: "div",
-                            classes: "editor-card",
-                            children: [
-                                { type: "h3", text: "Show Details" },
-                                { type: "p", classes: "show-meta-time", text: formattedDate }
-                            ]
-                        },
-                        // Roles Card
-                        {
-                            type: "div",
-                            classes: "editor-card",
-                            children: [
-                                {
-                                    type: "div",
-                                    classes: "card-header-flex",
-                                    children: [
-                                        { type: "h3", text: "Roles" },
-                                        { 
-                                            type: "svg", 
-                                            classes: ["btn-icon", "btn-outline-primary"], 
-                                            file: "icons/add.svg",
-                                            events: { click: addRole }
-                                        }
-                                    ]
-                                },
-                                {
-                                    type: "ul",
-                                    classes: "role-list",
-                                    children: data.roles.length > 0 ? data.roles.map(role => ({
-                                        type: "li",
-                                        classes: "role-badge",
-                                        text: role.name
-                                    })) : [{ type: "small", classes: "empty-msg", text: "No roles created yet." }]
-                                }
-                            ]
-                        }
-                    ]
-                },
+    let content = [
+        // Base Layout Containers
+        { type: "div", classes: "show-editor-container", varId: "editorContainer" },
+        { type: "aside", classes: "show-editor-sidebar", varId: "sidebar", target: "@editorContainer" },
+        
+        // Sidebar: Details Card
+        { type: "div", classes: "editor-card", varId: "editorCard", target: "@sidebar" },
+        { type: "h3", text: "Show Details", target: "@editorCard" },
+        { type: "p", classes: "show-meta-time", text: formattedDate, target: "@editorCard" },
 
-                // --- MAIN CONTENT: Scenario Lines & Comments ---
-                {
-                    type: "section",
-                    classes: "show-editor-main",
-                    children: [
-                        {
-                            type: "div",
-                            classes: "card-header-flex",
-                            children: [
-                                { type: "h3", text: "Run Sheet & Scenario Lines" },
-                                { 
-                                    type: "svg", 
-                                    classes: ["btn-icon", "btn-outline-primary"], 
-                                    file: "icons/add.svg",
-                                    events: { click: addLine }
-                                }
-                            ]
-                        },
-                        {
-                            type: "div",
-                            classes: "lines-table-wrapper",
-                            children: [
-                                {
-                                    type: "table",
-                                    classes: "lines-table",
-                                    children: [
-                                        {
-                                            type: "thead",
-                                            children: [{
-                                                type: "tr",
-                                                children: [
-                                                    { type: "th", text: "time", style: { width: "60px" } },
-                                                    { type: "th", text: "Cue" },
-                                                    { type: "th", text: "Note" },
-                                                    { type: "th", text: "Comments" },
-                                                    { type: "th", text: "Actions", style: { width: "100px", textAlign: "right" } }
-                                                ]
-                                            }]
-                                        },
-                                        {
-                                            type: "tbody",
-                                            children: data.lines.length > 0 ? data.lines.map(line => buildLineRow(line, data.comments, data.roles)) : [{
-                                                type: "tr",
-                                                children: [{
-                                                    type: "td",
-                                                    attributes: { colspan: "4" },
-                                                    classes: "empty-table-cell",
-                                                    text: "No scenario lines added yet. Click '+ Add Line' to start building your run sheet."
-                                                }]
-                                            }]
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
-        }
+        // Sidebar: Roles Card
+        { type: "div", classes: "editor-card", varId: "roleCard", target: "@sidebar" },
+        { type: "div", classes: "card-header-flex", varId: "roleCardHeader", target: "@roleCard" },
+        { type: "h3", text: "Roles", target: "@roleCardHeader" },
+        { type: "svg", classes: ["btn-icon", "btn-outline-primary"], file: "icons/add.svg", events: { click: addRole }, target: "@roleCardHeader" },
+        { type: "ul", classes: "role-list", varId: "roleCardList", target: "@roleCard" },
+
+        // Main Area: Run Sheet
+        { type: "section", classes: "show-editor-main", varId: "main", target: "@editorContainer" },
+        { type: "div", classes: "card-header-flex", varId: "mainHeader", target: "@main" },
+        { type: "h3", text: "Run Sheet", target: "@mainHeader" },
+        { type: "svg", classes: ["btn-icon", "btn-outline-primary"], file: "icons/add.svg", events: { click: addLine }, target: "@mainHeader" },
+        
+        // Table Architecture
+        { type: "div", classes: "lines-table-wrapper", varId: "tableWrapper", target: "@main" },
+        { type: "table", classes: "lines-table", varId: "table", target: "@tableWrapper" },
+        { type: "thead", varId: "tableHeader", target: "@table" },
+        { type: "tr", varId: "tableHeaderRow", target: "@tableHeader" },
+        { type: "th", text: "Time", style: { width: "60px" }, target: "@tableHeaderRow" },
+        { type: "th", text: "Cue", target: "@tableHeaderRow" },
+        { type: "th", text: "Note", target: "@tableHeaderRow" },
+        { type: "th", text: "Comments", target: "@tableHeaderRow" },
+        { type: "th", text: "Actions", style: { width: "100px", textAlign: "right" }, target: "@tableHeaderRow" },
+        { type: "tbody", varId: "tableBody", target: "@table" }
     ];
+
+    // Dynamic Roles Population (Spreading flat array)
+    const roleItems = data.roles.length > 0 ?
+        data.roles.map(role => ({
+            type: "li",
+            classes: "role-badge",
+            text: role.name,
+            target: "@roleCardList"
+        }))
+        :
+        [{ type: "small", classes: "empty-msg", text: "No roles created yet.", target: "@roleCardList" }];
+
+    // Dynamic Scenario Lines Population (Spreading flat array)
+    const lineItems = data.lines.length > 0 ?
+        data.lines.flatMap(line => buildLineRow(line, data.comments, data.roles)) // flatMap in case buildLineRow returns array of elements
+        :
+        [{
+            type: "tr",
+            target: "@tableBody",
+            children: [{
+                type: "td",
+                attributes: { colspan: "5" }, // Updated colspan to 5 to match the 5 header columns
+                classes: "empty-table-cell",
+                text: "No scenario lines added yet. Click '+ Add Line' to start building your run sheet."
+            }]
+        }];
+
+    // Flatten everything into a single level array for dynamicGenerator
+    return [...content, ...roleItems, ...lineItems];
 }
 
 /**
@@ -148,47 +102,35 @@ function buildEditShowLayout(data) {
  */
 function buildLineRow(line, allComments, allRoles) {
     const lineComments = allComments.filter(c => c.line_id === line.id);
-    console.log(line);
 
-    return {
-        type: "tr",
-        data: {id: line.id},
-        children: [
-            { type: "td", classes: "line-number-cell", text: line.time_mode == 1 ? line.time : `+${line.time}` },
-            { type: "td", classes: "line-content-cell", text: line.name },
-            { type: "td", classes: "line-note-cell", text: line.comment },
-            {
-                type: "td",
-                classes: "line-comments-cell",
-                children: [
-                    ...lineComments.map(comment => {
-                        const assignedRole = allRoles.find(r => r.id === comment.role_id);
-                        return {
-                            type: "div",
-                            classes: "comment-bubble",
-                            children: [
-                                ...(assignedRole ? [{ type: "span", classes: "comment-role-tag", text: assignedRole.name }] : []),
-                                { type: "span", text: comment.comment }
-                            ]
-                        };
-                    }),
-                    {
-                        type: "button",
-                        classes: ["btn-text-action"],
-                        text: "+ Note",
-                        events: { click: () => addComment(line.id) }
-                    }
-                ]
-            },
-            {
-                type: "td",
-                style: { textAlign: "right" },
-                children: [
-                    {type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-danger"], events: { click: () => deleteLine(line.id) } }
-                ]
-            }
-        ]
-    };
+    let content = [
+        {type: "tr", target: "@tableBody", data: {id: line.id}, varId: "lineRow"},
+        {type: "td", classes: "line-number-cell", text: line.time_mode == 1 ? line.time : `+${line.time}`, target: "@lineRow"},
+        {type: "td", classes: "line-content-cell", text: line.name, target: "@lineRow"},
+        {type: "td", classes: "line-note-cell", text: line.comment, target: "@lineRow"},
+        {type: "td", classes: "line-comments-cell", varId: "commentsCell", target: "@lineRow"},
+        {type: "td", classes: "line-action-cell", varId: "actionCell", target: "@lineRow"},
+        {type: "div", classes: "line-action-cell-wrapper", varId: "actionWrapper", target: "@actionCell"},
+        {type: "svg", file: "icons/edit.svg", classes: ["btn-icon", "btn-muted"], target: "@actionWrapper"},
+        {type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-danger"], events: { click: () => deleteLine(line.id) }, target: "@actionWrapper"}
+    ];
+
+    const notes = lineComments.map(comment => {
+        const assignedRole = allRoles.find(r => r.id === comment.role_id);
+        return {
+            type: "div",
+            classes: "comment-bubble",
+            target: "@commentsCell",
+            children: [
+                ...(assignedRole ? [{ type: "span", classes: "comment-role-tag", text: assignedRole.name }] : []),
+                { type: "span", text: comment.comment }
+            ]
+        };
+    });
+
+    const addNoteBtn = {type: "button", classes: ["btn-text-action"], text: "+ Note", events: {click: () => addComment(line.id)}, target: "@commentsCell"}
+
+    return [...content, ...notes, addNoteBtn];
 }
 
 async function addRole() {
@@ -210,38 +152,26 @@ async function addLine() {
     const lineCount = currentShowData ? currentShowData.lines.length + 1 : 1;
 
     const lineData = await dynamicPrompt({
-        title: "Add Scenario Line",
-        confirmText: "Add Line",
-        elements: [
-            // Side-by-side Row for Time Settings
-            {
-                type: "div",
-                classes: "form-row-2col",
-                children: [
-                    {
-                        type: "div",
-                        classes: "form-group",
-                        children: [
-                            {type: "select-label", label: "Time Mode", id: "timeReference", options: [
-                                { type: "option", attributes: { value: "relative" }, text: "Relative (+00:00)" },
-                                { type: "option", attributes: { value: "absolute" }, text: "Absolute (Clock)" }
-                            ]}
-                        ]
-                    },
-                    {
-                        type: "div",
-                        classes: "form-group",
-                        children: [
-                            {type: "input-label", id: "timeValue", label: "Time / Offset", placeholder: "e.g., +05:00 or 20:15"}
-                        ]
-                    }
-                ]
-            },
+    title: "Add Scenario Line",
+    confirmText: "Add Line",
+    elements: [
+        // 1. Two-Column Row for Time Controls
+        {type: "div", classes: "form-row-2col", varId: "timeRow" },
+        
+        {type: "div", classes: "form-group", varId: "timeModeGroup", target: "@timeRow" },
+        {type: "select-label", label: "Time Mode", id: "timeReference", options: [
+            { type: "option", attributes: { value: "relative" }, text: "Relative (+00:00)" },
+            { type: "option", attributes: { value: "absolute" }, text: "Absolute (Clock)" }
+        ], target: "@timeModeGroup"},
 
-            {type: "input-label", id: "lineName", label: "Line Name", placeholder: "e.g., Intro Cue"},
-            {type: "textarea-label", id: "lineContent", label: "Cue Description / Script Line", placeholder: "Enter cue description...", rows: 3}
-        ]
-    });
+        {type: "div", classes: "form-group", varId: "timeValueGroup", target: "@timeRow" },
+        {type: "input-label", id: "timeValue", label: "Time / Offset", target: "@timeValueGroup"},
+
+        // 2. Full-Width Main Fields (No target needed -> appends directly to modal body)
+        {type: "input-label", id: "lineName", label: "Cue Name", placeholder: "e.g., Intro Cue"},
+        {type: "textarea-label", id: "lineContent", label: "Cue Description", placeholder: "Enter cue description...", rows: 3}
+    ]
+});
 
     if (!lineData || !lineData.lineContent) return;
 
