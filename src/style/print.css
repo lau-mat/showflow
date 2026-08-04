@@ -1,58 +1,260 @@
 /* ==========================================================================
-   Print & PDF Generation Rules
+   ShowFlow Production Suite - High-Contrast A4 Print & Export Styles
    ========================================================================== */
 
-/* Hide everything in the main app when printing */
 @media print {
-  body * {
-    visibility: hidden;
+  /* 1. Page & Container Constraints */
+  @page {
+    size: A4 portrait;
+    margin: 10mm; /* 10mm margins = 190mm available printable width */
   }
 
-  /* Only show the dedicated print container and its children */
-  #print-container, #print-container * {
-    visibility: visible;
-  }
-
-  #print-container {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    color: #000 !important;
-    background: #fff !important;
-  }
-
-  /* Force background colors/borders to print cleanly */
-  * {
+  *, *::before, *::after {
+    box-sizing: border-box !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Page setup & breaks */
-  @page {
-    size: A4 portrait; /* or landscape */
-    margin: 12mm;
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    font-size: 8pt !important;
+    line-height: 1.25 !important;
+    overflow: visible !important;
   }
 
-  /* Avoid splitting table rows or comments across page breaks */
-  tr, .print-comment-item {
+  /* Hide main software interface */
+  body > *:not(#print-container) {
+    display: none !important;
+  }
+
+  /* 2. Print Container Canvas */
+  #print-container {
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 180mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Multi-page Section Breaking */
+  .print-page-section {
+    break-after: page !important;
+    page-break-after: always !important; /* Fallback for legacy print drivers */
+    display: block !important;
+    width: 180mm !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .print-page-section:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  /* 3. Document Header & Typography (FIXED ALIGNMENT) */
+  .print-header {
+    border-bottom: 2px solid #000 !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 10px !important;
+    width: 100% !important;
+  }
+
+  .print-header-main {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+
+  .print-header h1 {
+    font-size: 13pt !important;
+    font-weight: 800 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-transform: uppercase !important;
+    letter-spacing: -0.01em !important;
+    color: #000 !important;
+    line-height: 1 !important;
+  }
+
+  .print-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: fit-content !important;
+    max-width: max-content !important;
+    font-size: 7.5pt !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
+    border: 1px solid #000 !important;
+    background-color: #eaeaea !important;
+    color: #000 !important;
+    padding: 3px 6px !important;
+    border-radius: 3px !important;
+    line-height: 1 !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .print-meta-grid {
+    display: flex !important;
+    justify-content: space-between !important;
+    font-size: 7.5pt !important;
+    color: #333 !important;
+    margin-top: 6px !important;
+  }
+
+  /* 4. Table Architecture & Column Sizing */
+  .print-table {
+    width: 180mm !important;
+    max-width: 180mm !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    margin: 0 !important;
+  }
+
+  .print-table thead {
+    display: table-header-group; /* Repeats table headers on multi-page long sheets */
+  }
+
+  .print-table tr {
     page-break-inside: avoid;
   }
 
-  .print-header {
-    border-bottom: 2px solid #000;
-    margin-bottom: 15px;
-    padding-bottom: 5px;
+  .print-table th {
+    background-color: #eaeaea !important;
+    border: 1px solid #666 !important;
+    font-size: 7.5pt !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.02em !important;
+    padding: 4px 6px !important;
+    text-align: left !important;
+    color: #000 !important;
   }
 
-  .print-table {
-    width: 100%;
-    border-collapse: collapse;
+  .print-table td {
+    border: 1px solid #888 !important;
+    padding: 4px 6px !important;
+    font-size: 8pt !important;
+    vertical-align: top !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow-wrap: anywhere !important;
   }
 
-  .print-table th, .print-table td {
-    border: 1px solid #ccc;
-    padding: 6px 8px;
-    font-size: 11pt;
+  /* Precise Column Width Allocation (Sum = 180mm) */
+  .col-time     { width: 20mm !important; }  /* Time offset */
+  .col-cue      { width: 35mm !important; }  /* Cue Name */
+  .col-note     { width: 70mm !important; }  /* Cue Description / Script Line */
+  .col-comments { width: 55mm !important; }  /* Role Comments */
+
+  /* 5. Role Comment Cards & Badges (FIXED BADGE FLOW & SCALING) */
+  .print-comment-card {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important; /* Keeps role badge tightly fitted to its text width */
+    width: 100% !important;
+    border: 1px solid #b0b0b8 !important;
+    border-radius: 3px !important;
+    padding: 4px 5px !important;
+    margin-bottom: 4px !important;
+    background-color: #fcfcfc !important;
+    page-break-inside: avoid;
+  }
+
+  .print-comment-card:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .print-comment-role {
+    display: inline-block !important;
+    width: auto !important; /* Tight wrap to text width */
+    max-width: 100% !important;
+    font-size: 6.5pt !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.03em !important;
+    color: #000 !important;
+    background-color: #e2e2e8 !important;
+    border: 1px solid #abab50 !important;
+    padding: 1.5px 4px !important;
+    border-radius: 2px !important;
+    margin: 0 0 3px 0 !important; /* Clean bottom space before comment body */
+    line-height: 1 !important;
+  }
+
+  .print-comment-text {
+    display: block !important;
+    width: 100% !important;
+    font-size: 7.5pt !important;
+    line-height: 1.25 !important;
+    color: #111 !important;
+    word-break: break-word !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-empty-text {
+    color: #888 !important;
+    font-size: 7.5pt !important;
+    font-style: italic !important;
+  }
+
+  /* Tighten vertical spacing inside comment cells */
+  .print-table td.col-comments {
+    padding: 3px !important;
+    vertical-align: top !important;
+  }
+
+  /* Ensure comment cards stack tightly with a tight 3px gap */
+  .print-comment-card {
+    display: block !important;
+    width: 100% !important;
+    border: 1px solid #b0b0b8 !important;
+    border-radius: 3px !important;
+    padding: 3px 4px !important;
+    margin: 0 0 3px 0 !important; /* Forces exact 3px gap between consecutive comments */
+    background-color: #fcfcfc !important;
+    box-sizing: border-box !important;
+  }
+
+  .print-comment-card:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .print-comment-role {
+    display: inline-block !important;
+    font-size: 6.5pt !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.03em !important;
+    color: #000 !important;
+    background-color: #e2e2e8 !important;
+    border: 1px solid #ababf5 !important;
+    padding: 1px 3.5px !important;
+    border-radius: 2px !important;
+    margin: 0 0 2px 0 !important;
+    line-height: 1 !important;
+  }
+
+  .print-comment-text {
+    display: block !important;
+    font-size: 7.5pt !important;
+    line-height: 1.2 !important;
+    color: #111 !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }

@@ -9,7 +9,7 @@ const validElementTypes = [
 const compoundComponents = {
     "input-label": [
         { type: "label", attributes: { for: "&id" }, text: "&label" },
-        { type: "input", attributes: { type: "text", placeholder: "&placeholder" }, id: "&id" }
+        { type: "input", attributes: { type: "text", placeholder: "&placeholder", value: "&value" }, id: "&id" }
     ],
     "select-label": [
         { type: "label", attributes: { for: "&id" }, text: "&label" },
@@ -17,7 +17,7 @@ const compoundComponents = {
     ],
     "textarea-label": [
         { type: "label", attributes: { for: "&id" }, text: "&label" },
-        { type: "textarea", attributes: { rows: "&rows", placeholder: "&placeholder" }, id: "&id" }
+        { type: "textarea", attributes: { rows: "&rows", placeholder: "&placeholder" }, properties: {value: "&value"}, id: "&id" }
     ]
 };
 
@@ -52,16 +52,30 @@ function interpolateTemplate(template, props) {
 
 const dynamicGenerator = ( definition, location = document.body ) => {
     if (definition.type && compoundComponents[definition.type]) {
-        const template = compoundComponents[definition.type];
-        const interpolatedElements = interpolateTemplate(template, definition);
-        const groupContainer = dynamicGenerator({
-            type: "div",
-            classes: ["form-group", ...(definition.classes ? [definition.classes].flat() : [])]
-        }, location);
+    const template = compoundComponents[definition.type];
+    const interpolatedElements = interpolateTemplate(template, definition);
+    
+    // 1. Pass wrapper ID, style, and classes to the form-group container
+    const groupContainer = dynamicGenerator({
+        type: "div",
+        id: definition.id ? `${definition.id}-group` : undefined, // Optional wrapper ID
+        classes: ["form-group", ...(definition.classes ? [definition.classes].flat() : [])],
+        style: definition.style // Now style: { display: "none" } works on the wrapper!
+    }, location);
 
-        interpolatedElements.forEach(childDef => dynamicGenerator(childDef, groupContainer));
-        return groupContainer;
-    }
+    // 2. Attach top-level events & attributes to the child input/select element
+    interpolatedElements.forEach(childDef => {
+        if (["select", "input", "textarea"].includes(childDef.type)) {
+            if (definition.events) childDef.events = definition.events;
+            if (definition.attributes) {
+                childDef.attributes = { ...childDef.attributes, ...definition.attributes };
+            }
+        }
+        dynamicGenerator(childDef, groupContainer);
+    });
+
+    return groupContainer;
+}
 
     if (!definition.type || typeof definition.type !== "string") return console.error("Invalid element type:", definition);
     if (!validElementTypes.includes(definition.type)) return console.error("Unsupported element type:", definition.type);

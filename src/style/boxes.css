@@ -43,6 +43,7 @@
 .dialog-box.fullscreen {
   width: 100vw !important;
   height: 100vh !important;
+  max-height: 100vh !important; /* Forces hard height ceiling */
   top: 0 !important;
   left: 0 !important;
   transform: none !important;
@@ -90,12 +91,12 @@
 
 /* Content Area */
 .modal-content {
-  padding: 1.25rem;
-  overflow-y: auto;
+  overflow: hidden !important; 
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  flex: 1;
+  height: calc(100vh - 45px); /* Subtract header height */
+  padding: 1.25rem;
+  box-sizing: border-box;
 }
 
 /* Footer & Buttons */

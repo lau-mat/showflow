@@ -257,6 +257,19 @@ fn add_scenario_line_comment(state: State<'_, db::DbState>, line_id: i64, role_i
     Ok(scenario_line_comment)
 }
 
+#[tauri::command]
+fn edit_scenario_line_comment(state: State<'_, db::DbState>, comment_id: i64, role_id: Option<i64>, comment: &str) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "UPDATE show_scenario_line_comment SET comment = ?1, role_id = ?2 WHERE id = ?3",
+        rusqlite::params![comment, role_id, comment_id],
+    ).map_err(|e| e.to_string())?;
+
+    println!("Comment with ID {} updated to: {}", comment_id, comment);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -274,7 +287,8 @@ pub fn run() {
             add_role,
             add_scenario_line,
             delete_scenario_line,
-            add_scenario_line_comment
+            add_scenario_line_comment,
+            edit_scenario_line_comment
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -59,7 +59,7 @@ function buildEditShowLayout(data) {
 
         // 2. Target both icons to @mainHeaderActions instead of @mainHeader
         { type: "svg", classes: ["btn-icon", "btn-outline-primary"], file: "icons/add.svg", events: { click: addLine }, target: "@mainHeaderActions" },
-        { type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/print.svg", events: { click: () => openPrintDialog(currentShowData) }, target: "@mainHeaderActions" },
+        { type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/print.svg", events: { click: openPrintDialog }, target: "@mainHeaderActions" },
         
         // Table Architecture
         { type: "div", classes: "lines-table-wrapper", varId: "tableWrapper", target: "@main" },
@@ -147,7 +147,9 @@ function buildLineRow(line, allComments, allRoles) {
                 ...(assignedRole ? [{ type: "span", classes: "comment-role-tag", text: assignedRole.name }] : []),
                 {type: "span", text: comment.comment, classes: "comment-body-text"}
             ],
-            data: {commentRoleId: comment.role_id}
+            data: {commentRoleId: comment.role_id},
+            style: {cursor: "pointer"},
+            events: {click: () => addComment(comment.line_id, comment.id)}
         };
     });
 
@@ -209,12 +211,16 @@ async function addLine() {
     await refreshShowData();
 }
 
-async function addComment(lineId) {
+async function addComment(lineId, commentId = null) {
+    const commentEdit = currentShowData.comments.find(c => c.id == commentId);
+    const commentValue = commentEdit?.comment ?? "";
+    const commentRoleValue = commentEdit?.role_id ?? null;
+
     const roleOptions = [
         { type: "option", attributes: { value: "" }, text: "General (No Role)" },
         ...currentShowData.roles.map(r => ({
             type: "option",
-            attributes: { value: r.id },
+            attributes: { value: r.id, ...(r.id === commentRoleValue ? { selected: "selected" } : {}) },
             text: r.name
         }))
     ];
@@ -224,17 +230,25 @@ async function addComment(lineId) {
         confirmText: "Save Note",
         elements: [
             {type: "select-label", id: "roleId", label: "Assign to Role", options: roleOptions},
-            {type: "textarea-label", id: "commentText", label: "Comment", rows: "2"}
+            {type: "textarea-label", id: "commentText", label: "Comment", rows: "2", value: commentValue}
         ]
     });
 
     if (!commentData || !commentData.commentText) return;
 
-    await invoke("add_scenario_line_comment", {
-        lineId: lineId,
-        roleId: commentData.roleId ? parseInt(commentData.roleId, 10) : null,
-        comment: commentData.commentText
-    });
+    if(commentId){
+        await invoke("edit_scenario_line_comment", {
+            commentId,
+            roleId: commentData.roleId ? parseInt(commentData.roleId, 10) : null,
+            comment: commentData.commentText
+        })
+    } else {
+        await invoke("add_scenario_line_comment", {
+            lineId: lineId,
+            roleId: commentData.roleId ? parseInt(commentData.roleId, 10) : null,
+            comment: commentData.commentText
+        });
+    }
     await refreshShowData();
 }
 
@@ -259,18 +273,25 @@ function toggleRoleVisibility(roleId, svgElement) {
     });
 }
 
-async function openPrintDialog(data) {
+async function openPrintDialog() {
     const options = await dynamicPrompt({
         title: "Print & Export Run Sheet",
         confirmText: "Generate Printable View",
         elements: [
-            { type: "div", classes: "form-group" },
             {
                 type: "select-label",
                 id: "printMode",
                 label: "Target Layout",
+                events: {
+                    change: (e) => {
+                        const roleSelectGroup = document.getElementById("roleSelect-group");
+                        if (roleSelectGroup) {
+                            roleSelectGroup.style.display = (e.target.value === "single_role") ? "block" : "none";
+                        }
+                    }
+                },
                 options: [
-                    { type: "option", attributes: { value: "master" }, text: "Master Run Sheet (All Roles & Comments)" },
+                    { type: "option", attributes: { value: "all_roles_separate" }, text: "Master Run Sheet (All Roles & Comments)" },
                     { type: "option", attributes: { value: "director" }, text: "Director's Cut (Cues & Notes Only)" },
                     { type: "option", attributes: { value: "single_role" }, text: "Role Specific Sheet..." }
                 ]
@@ -279,22 +300,22 @@ async function openPrintDialog(data) {
                 type: "select-label",
                 id: "roleSelect",
                 label: "Select Role",
-                options: data.roles.map(r => ({
+                options: (currentShowData.roles || []).map(r => ({
                     type: "option",
                     attributes: { value: r.id },
                     text: r.name
-                }))
+                })),
+                style: { display: "none" } // Hidden on wrapper container!
             }
         ]
     });
 
     if (options) {
-        generateAndPrintSheet(data, options);
+        generateAndPrintSheet(currentShowData, options);
     }
 }
 
 function generateAndPrintSheet(data, options) {
-    // 1. Get or create the dedicated print container
     let printContainer = document.getElementById("print-container");
     if (!printContainer) {
         printContainer = document.createElement("div");
@@ -302,53 +323,95 @@ function generateAndPrintSheet(data, options) {
         document.body.appendChild(printContainer);
     }
 
-    // 2. Filter lines & comments based on modal settings
-    let filteredComments = data.comments;
-    if (options.printMode === "single_role") {
-        const selectedRoleId = Number(options.roleSelect);
-        filteredComments = data.comments.filter(c => c.role_id === selectedRoleId);
-    } else if (options.printMode === "director") {
-        filteredComments = []; // No role comments for director view
-    }
-
-    // 3. Build high-contrast paper layout HTML
     const showTitle = data.show.name || "Show Run Sheet";
     const formattedDate = new Date(data.show.time * 1000).toLocaleString();
 
-    let tableRowsHtml = data.lines.map(line => {
-        const lineComments = filteredComments.filter(c => c.line_id === line.id);
-        const commentText = lineComments.map(c => `• ${c.text}`).join("<br>");
+    // Helper: Identify General / Global comments
+    const isGeneralComment = (comment) => {
+        if (!comment.role_id) return true;
+        const role = data.roles.find(r => r.id == comment.role_id);
+        return !role || role.name.toLowerCase() === "general";
+    };
+
+    // Helper to build a single printable A4 page sheet
+    const buildSheetSection = (titleSub, commentsList) => {
+        const tableRowsHtml = data.lines.map(line => {
+            const lineComments = commentsList.filter(c => c.line_id === line.id);
+            
+            const commentsHtml = lineComments.length > 0 
+                ? lineComments.map(c => {
+                    const role = data.roles.find(r => r.id == c.role_id)?.name || "General";
+                    const cleanText = (c.comment || '').trim().replaceAll('\n', '<br>');
+                    return `<div class="print-comment-card"><span class="print-comment-role">${role}</span><div class="print-comment-text">${cleanText}</div></div>`;
+                }).join("")
+                : `<span class="print-empty-text">—</span>`;
+
+            return `
+                <tr>
+                    <td class="col-time"><strong>${line.time || ''}</strong></td>
+                    <td class="col-cue"><strong>${line.name || ''}</strong></td>
+                    <td class="col-note">${(line.comment || '').trim().replaceAll('\n', '<br>')}</td>
+                    <td class="col-comments">${commentsHtml}</td>
+                </tr>
+            `;
+        }).join("");
 
         return `
-            <tr>
-                <td style="width: 70px;"><strong>${line.time || ''}</strong></td>
-                <td style="width: 140px;"><strong>${line.name || ''}</strong></td>
-                <td>${line.content || ''}</td>
-                <td>${commentText}</td>
-            </tr>
+            <section class="print-page-section">
+                <header class="print-header">
+                    <div class="print-header-main">
+                        <h1>${showTitle}</h1>
+                        <span class="print-badge">${titleSub}</span>
+                    </div>
+                    <div class="print-meta-grid">
+                        <div><strong>Date/Time:</strong> ${formattedDate}</div>
+                        <div><strong>Generated:</strong> ${new Date().toLocaleTimeString()}</div>
+                    </div>
+                </header>
+                <table class="print-table">
+                    <thead>
+                        <tr>
+                            <th class="col-time">Time</th>
+                            <th class="col-cue">Cue</th>
+                            <th class="col-note">Note / Description</th>
+                            <th class="col-comments">Role Comments</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tableRowsHtml}
+                    </tbody>
+                </table>
+            </section>
         `;
-    }).join("");
+    };
 
-    printContainer.innerHTML = `
-        <div class="print-header">
-            <h2>${showTitle}</h2>
-            <p><strong>Date/Time:</strong> ${formattedDate} | <strong>Layout:</strong> ${options.printMode}</p>
-        </div>
-        <table class="print-table">
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Cue</th>
-                    <th>Note / Description</th>
-                    <th>Role Comments</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${tableRowsHtml}
-            </tbody>
-        </table>
-    `;
+    let fullHtml = "";
 
-    // 4. Trigger Native Print Dialog (Handles Printer selection & PDF export automatically!)
+    if (options.printMode === "all_roles_separate") {
+        // Multi-page print: Includes Role Comments + General Comments for EVERY role sheet
+        data.roles.forEach(role => {
+            if (role.name.toLowerCase() === "general") return; // Skip standalone general page if iterating roles
+            
+            const roleComments = data.comments.filter(c => c.role_id === role.id || isGeneralComment(c));
+            fullHtml += buildSheetSection(`Role: ${role.name}`, roleComments);
+        });
+    } else if (options.printMode === "single_role") {
+        const selectedRoleId = Number(options.roleSelect);
+        const role = data.roles.find(r => r.id === selectedRoleId);
+        const roleName = role ? role.name : "Role";
+        
+        // Includes Role Comments + General Comments
+        const roleComments = data.comments.filter(c => c.role_id === selectedRoleId || isGeneralComment(c));
+        fullHtml = buildSheetSection(`Role: ${roleName}`, roleComments);
+    } else if (options.printMode === "director") {
+        fullHtml = buildSheetSection("Director Cut", []);
+    } else {
+        // Master Sheet (All roles + General)
+        fullHtml = buildSheetSection("Master Run Sheet", data.comments);
+    }
+
+    printContainer.innerHTML = fullHtml;
+
     window.print();
+    printContainer.remove();
 }
