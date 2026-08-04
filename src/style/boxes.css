@@ -36,14 +36,16 @@
 .modal-box {
   width: 90%;
   max-width: 500px;
-  max-height: 85vh;
+  max-height: 85vh; /* Natural height ceiling */
+  display: flex;
+  flex-direction: column;
 }
 
 /* Fullscreen Box Override */
 .dialog-box.fullscreen {
   width: 100vw !important;
   height: 100vh !important;
-  max-height: 100vh !important; /* Forces hard height ceiling */
+  max-height: 100vh !important;
   top: 0 !important;
   left: 0 !important;
   transform: none !important;
@@ -90,11 +92,19 @@
 }
 
 /* Content Area */
-.modal-content {
-  overflow: hidden !important; 
+.modal-box .modal-content {
+  overflow-y: auto; /* Standard prompts scroll their content if text is long */
+  height: auto;     /* Hugs content naturally */
+  flex: 1;
+  padding: 1.25rem;
+  box-sizing: border-box;
+}
+
+.dialog-box.fullscreen .modal-content {
+  overflow: hidden !important; /* Disables whole-dialog scrolling */
+  height: calc(100vh - 45px) !important; /* Locks full height shell */
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 45px); /* Subtract header height */
   padding: 1.25rem;
   box-sizing: border-box;
 }
@@ -104,6 +114,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
+  padding-top: 0.75rem;
 }
 
 /* Input Fields & Validation inside dynamic prompts */
