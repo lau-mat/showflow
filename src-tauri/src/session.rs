@@ -1,8 +1,11 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
 use tauri::State;
 use tokio::net::TcpListener;
 use tokio_tungstenite::accept_async;
+use futures_util::{SinkExt, StreamExt}; // Add these imports
+use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio::sync::mpsc;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Session {
@@ -18,9 +21,28 @@ pub struct AppState {
     pub shutdown_tx: Mutex<Option<tokio::sync::oneshot::Sender<()>>>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Client {
+    pub client_id: String,
+    pub client_name: Option<String>,
+    pub client_role: Option<i64>
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type", content = "payload", rename_all = "camelCase")]
+pub enum ClientMessage {
+    JoinSession { user_name: String, role_id: Option<i64>}
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type", content = "payload", rename_all = "camelCase")]
+pub enum ServerMessage {
+    JoinSession { user_id: String, active_cue: Option<i64>  }
+}
+
 // remember to call `.manage(MyState::default())`
 #[tauri::command]
-pub async fn start_session(show_id: String, state: State<'_, AppState>) -> Result<String, String> {
+pub async fn start_session(show_id: i64, state: State<'_, AppState>) -> Result<String, String> {
     let mut session_guard = state.session.lock().unwrap();
     if session_guard.is_some() {
         return Err("Session already running".into());
@@ -30,7 +52,7 @@ pub async fn start_session(show_id: String, state: State<'_, AppState>) -> Resul
     let session_id = uuid::Uuid::new_v4().to_string();
     let new_session = Session {
         session_id: session_id.clone(),
-        show_id: show_id.parse::<i64>().map_err(|e| e.to_string())?,
+        show_id,
         is_active: true,
         current_cue: None,
         joined_users: Vec::new(),
@@ -41,17 +63,67 @@ pub async fn start_session(show_id: String, state: State<'_, AppState>) -> Resul
     let (tx, rx) = tokio::sync::oneshot::channel::<()>();
     *state.shutdown_tx.lock().unwrap() = Some(tx);
 
+    let clients: Arc<Mutex<Vec<Client>>> = Arc ::new(Mutex::new(Vec::new()));
+    let server_session_id = session_id.clone();
+
     //spawn background websocket server
     tokio::spawn(async move {
-       let listener = TcpListener::bind("0.0.0.0:8080").await.expect("Failed to bind WebSocket server");
+       let listener = TcpListener::bind("0.0.0.0:23123").await.expect("Failed to bind WebSocket server");
 
        tokio::select! {
             _ = async {
                 while let Ok((stream, _)) = listener.accept().await {
+                    let clients_arc = Arc::clone(&clients);
+                    let client_session_id = server_session_id.clone();
+
+                    let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
+
                     tokio::spawn(async move {
                         if let Ok(ws_stream) = accept_async(stream).await {
-                            // Handle the WebSocket connection here
-                            // For example, you can read messages from the client and respond accordingly
+                            let client = Client {
+                                client_id: uuid::Uuid::new_v4().to_string(),
+                                client_name: None,
+                                client_role: None
+                            };
+
+                            println!("Client {} connected to live session {}", client.client_id, client_session_id);
+
+                            {
+                                let mut guard = clients_arc.lock().unwrap();
+                                guard.push(client.clone());
+                            }
+
+                            let (mut write, mut read) = ws_stream.split();
+                            while let Some(message) = read.next().await {
+                                match message {
+                                    Ok(msg) => {
+                                        if msg.is_text() {
+                                            let text = msg.to_text().unwrap_or_default();
+                                            println!("Received from client {}: {}", client.client_id, text);
+
+                                            let reply = format!("Server acknowledgment: {}", text);
+                                            if let Err(e) = write.send(Message::Text(reply)).await {
+                                                println!("Failed to send message: {}", e);
+                                                break;
+                                            }
+                                        } else if msg.is_close() {
+                                            break;
+                                        }
+                                    }
+
+                                    Err(e) => {
+                                        println!("WebSocket read error: {}", e);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            {
+                                let mut guard = clients_arc.lock().unwrap();
+                                guard.retain(|c| c.client_id != client.client_id);
+                            }
+
+                            println!("client {} disconnected", client.client_id);
                         }
                     });
                 }

@@ -13,7 +13,7 @@ function addShowItem(id, name, time){
     {type: "td", varId: "action-container", target: "@row"},
     {type: "div", classes: "actions-cell", target: "@action-container", varId: "action-cell"},
     {type: "svg", file: "icons/edit.svg", classes: ["btn-icon", "btn-muted"], target: "@action-cell", varId: "editBtn"},
-    {type: "svg", file: "icons/start.svg", classes: ["btn-icon", "btn-muted"], target: "@action-cell"},
+    {type: "svg", file: "icons/start.svg", classes: ["btn-icon", "btn-muted"], target: "@action-cell", varId: "startSession"},
     {type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-danger"], target: "@action-cell", varId: "delBtn" }
   ], "#editShowsTableBody");
 
@@ -23,6 +23,8 @@ function addShowItem(id, name, time){
   });
 
   item.editBtn.addEventListener("click", () => openEditShow(id, name));
+
+  item.startSession.addEventListener("click", () => startSession(id))
 }
 
 btnAddShow.addEventListener("click", async () => {
@@ -43,6 +45,11 @@ btnAddShow.addEventListener("click", async () => {
   shows.push({id: newShowId, name: newShowData.newShowName, time: unixTimestamp});
   addShowItem(newShowId.id, newShowData.newShowName, unixTimestamp);
 });
+
+async function startSession(id){
+  const sessionResponse = await invoke("start_session", {showId: id})
+  console.log(sessionResponse);
+}
 
 async function init(){
   shows = await invoke("get_shows");

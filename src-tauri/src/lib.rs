@@ -278,6 +278,12 @@ pub fn run() {
         .setup(|app| {
             let conn = db::init_db().expect("Failed to initialize database");
             app.manage(db::DbState(Mutex::new(conn)));
+
+            app.manage(session::AppState {
+                session: Mutex::new(None),
+                shutdown_tx: Mutex::new(None),
+            });
+            
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
