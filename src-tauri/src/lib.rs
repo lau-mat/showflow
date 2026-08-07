@@ -1,4 +1,5 @@
 mod db;
+mod session;
 
 use std::sync::Mutex;
 use tauri::State;
@@ -288,7 +289,8 @@ pub fn run() {
             add_scenario_line,
             delete_scenario_line,
             add_scenario_line_comment,
-            edit_scenario_line_comment
+            edit_scenario_line_comment,
+            session::start_session
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

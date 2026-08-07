@@ -122,6 +122,15 @@ function buildEditShowLayout(data) {
 /**
  * Builds a single table row for a Scenario Line and renders attached Comments inline
  */
+function sortCommentsByRole(comments) {
+    return [...comments].sort((a, b) => {
+        if (a.role_id === null && b.role_id === null) return 0; // 1. Both are null -> treat as equal
+        if (a.role_id === null) return -1; // 2. 'a' is null -> move 'a' to the front
+        if (b.role_id === null) return 1; // 3. 'b' is null -> move 'b' to the front
+        return a.role_id - b.role_id; // 4. Both have numeric IDs -> standard ascending numerical sort
+    });
+}
+    
 function buildLineRow(line, allComments, allRoles) {
     const lineComments = allComments.filter(c => c.line_id === line.id);
 
@@ -136,8 +145,8 @@ function buildLineRow(line, allComments, allRoles) {
         {type: "svg", file: "icons/edit.svg", classes: ["btn-icon", "btn-muted"], target: "@actionWrapper"},
         {type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-danger"], events: { click: () => deleteLine(line.id) }, target: "@actionWrapper"}
     ];
-
-    const notes = lineComments.map(comment => {
+    
+    const notes = sortCommentsByRole(lineComments).map(comment => {
         const assignedRole = allRoles.find(r => r.id === comment.role_id);
         return {
             type: "div",
@@ -339,7 +348,7 @@ function generateAndPrintSheet(data, options) {
             const lineComments = commentsList.filter(c => c.line_id === line.id);
             
             const commentsHtml = lineComments.length > 0 
-                ? lineComments.map(c => {
+                ? sortCommentsByRole(lineComments).map(c => {
                     const role = data.roles.find(r => r.id == c.role_id)?.name || "General";
                     const cleanText = (c.comment || '').trim().replaceAll('\n', '<br>');
                     return `<div class="print-comment-card"><span class="print-comment-role">${role}</span><div class="print-comment-text">${cleanText}</div></div>`;
@@ -404,10 +413,9 @@ function generateAndPrintSheet(data, options) {
         const roleComments = data.comments.filter(c => c.role_id === selectedRoleId || isGeneralComment(c));
         fullHtml = buildSheetSection(`Role: ${roleName}`, roleComments);
     } else if (options.printMode === "director") {
-        fullHtml = buildSheetSection("Director Cut", []);
-    } else {
-        // Master Sheet (All roles + General)
         fullHtml = buildSheetSection("Master Run Sheet", data.comments);
+    } else {
+        fullHtml = buildSheetSection("Master Run Sheet", []);
     }
 
     printContainer.innerHTML = fullHtml;
