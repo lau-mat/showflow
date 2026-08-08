@@ -1,27 +1,28 @@
 mod db;
 mod session;
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::State;
 use tauri::Manager;
 use tauri_plugin_opener;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
+use rusqlite::Connection;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Show {
     pub id: i64,
     pub name: String,
     pub time: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ShowRole {
     pub id: i64,
     pub show_id: i64,
     pub name: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ScenarioLineComment {
     pub id: i64,
     pub line_id: i64,
@@ -29,7 +30,7 @@ pub struct ScenarioLineComment {
     pub comment: String
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ScenarioLine {
     pub id: i64,
     pub order: i64,
@@ -39,7 +40,7 @@ pub struct ScenarioLine {
     pub time_mode: i64
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ShowDetails {
     pub show: Show,
     pub roles: Vec<ShowRole>,
@@ -47,59 +48,8 @@ pub struct ShowDetails {
     pub comments: Vec<ScenarioLineComment>,
 }
 
-#[tauri::command]
-fn new_show(state: State<'_, db::DbState>, name: &str, time: i64) -> Result<Show, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-
-    conn.execute(
-        "INSERT INTO shows (show_name, show_time) VALUES (?1, ?2)",
-        rusqlite::params![name, time],
-    ).map_err(|e| e.to_string())?;
-
-    let id = conn.last_insert_rowid();
-
-    let show = Show {
-        id,
-        name: name.to_string(),
-        time: time,
-    };
-    println!("New show created: {} at {}", show.name, show.time);
-    Ok(show)
-}
-
-#[tauri::command]
-fn get_shows(state: State<'_, db::DbState>) -> Result<Vec<Show>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;  
-    let mut stmt = conn.prepare("SELECT show_id, show_name, show_time FROM shows").map_err(|e| e.to_string())?;
-    let show_iter = stmt.query_map([], |row| {
-        Ok(Show {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            time: row.get(2)?,
-        })
-    }).map_err(|e| e.to_string())?;
-
-    let mut shows = Vec::new();
-    for show in show_iter {
-        shows.push(show.map_err(|e| e.to_string())?);
-    }
-    Ok(shows)
-}
-
-#[tauri::command]
-fn delete_show(state: State<'_, db::DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    conn.execute(
-        "DELETE FROM shows WHERE show_id = ?1",
-        &[&id],
-    ).map_err(|e| e.to_string())?;
-    println!("Show with ID {} deleted", id);
-    Ok(())
-}
-
-#[tauri::command]
-fn get_full_show_details(state: State<'_, db::DbState>, show_id: i64) -> Result<ShowDetails, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
+pub fn fetch_show_details(db: &Arc<Mutex<Connection>>, show_id: i64) -> Result<ShowDetails, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
 
     // 1. Fetch the main Show
     let show = conn.query_row(
@@ -155,9 +105,9 @@ fn get_full_show_details(state: State<'_, db::DbState>, show_id: i64) -> Result<
     let mut comments_stmt = conn
         .prepare(
             "SELECT c.id, c.line_id, c.role_id, c.comment 
-             FROM show_scenario_line_comment c
-             JOIN show_scenario_line l ON c.line_id = l.scenario_line_id
-             WHERE l.show_id = ?1"
+            FROM show_scenario_line_comment c
+            JOIN show_scenario_line l ON c.line_id = l.scenario_line_id
+            WHERE l.show_id = ?1"
         )
         .map_err(|e| e.to_string())?;
 
@@ -174,13 +124,68 @@ fn get_full_show_details(state: State<'_, db::DbState>, show_id: i64) -> Result<
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
 
-    // Return the aggregated struct
     Ok(ShowDetails {
         show,
         roles,
         lines,
         comments,
     })
+}
+
+#[tauri::command]
+fn new_show(state: State<'_, db::DbState>, name: &str, time: i64) -> Result<Show, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "INSERT INTO shows (show_name, show_time) VALUES (?1, ?2)",
+        rusqlite::params![name, time],
+    ).map_err(|e| e.to_string())?;
+
+    let id = conn.last_insert_rowid();
+
+    let show = Show {
+        id,
+        name: name.to_string(),
+        time: time,
+    };
+    println!("New show created: {} at {}", show.name, show.time);
+    Ok(show)
+}
+
+#[tauri::command]
+fn get_shows(state: State<'_, db::DbState>) -> Result<Vec<Show>, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;  
+    let mut stmt = conn.prepare("SELECT show_id, show_name, show_time FROM shows").map_err(|e| e.to_string())?;
+    let show_iter = stmt.query_map([], |row| {
+        Ok(Show {
+            id: row.get(0)?,
+            name: row.get(1)?,
+            time: row.get(2)?,
+        })
+    }).map_err(|e| e.to_string())?;
+
+    let mut shows = Vec::new();
+    for show in show_iter {
+        shows.push(show.map_err(|e| e.to_string())?);
+    }
+    Ok(shows)
+}
+
+#[tauri::command]
+fn delete_show(state: State<'_, db::DbState>, id: i64) -> Result<(), String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM shows WHERE show_id = ?1",
+        &[&id],
+    ).map_err(|e| e.to_string())?;
+    println!("Show with ID {} deleted", id);
+    Ok(())
+}
+
+#[tauri::command]
+fn get_full_show_details(state: State<'_, db::DbState>, show_id: i64) -> Result<ShowDetails, String> {
+    let response = fetch_show_details(&state.0, show_id)?;
+    Ok(response)
 }
 
 #[tauri::command]
@@ -277,7 +282,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let conn = db::init_db().expect("Failed to initialize database");
-            app.manage(db::DbState(Mutex::new(conn)));
+            app.manage(db::DbState(Arc::new(Mutex::new(conn))));
 
             app.manage(session::AppState {
                 session: Mutex::new(None),

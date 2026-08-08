@@ -1,8 +1,8 @@
 use rusqlite_migration::{Migrations, M};
 use rusqlite::Connection;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-pub struct DbState(pub Mutex<Connection>);
+pub struct DbState(pub Arc<Mutex<Connection>>);
 
 fn get_migrations() -> Migrations<'static> {
     Migrations::new(vec![

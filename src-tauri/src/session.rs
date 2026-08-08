@@ -1,3 +1,5 @@
+use crate::{ShowDetails, db, fetch_show_details};
+
 use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
 use tauri::State;
@@ -29,20 +31,40 @@ pub struct Client {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(tag = "type", content = "payload", rename_all = "camelCase")]
+#[serde(tag = "command", rename_all = "snake_case")]
 pub enum ClientMessage {
-    JoinSession { user_name: String, role_id: Option<i64>}
+    JoinSession { user_name: String, role_id: Option<i64>},
+    GetShowData
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "type", content = "payload", rename_all = "camelCase")]
 pub enum ServerMessage {
-    JoinSession { user_id: String, active_cue: Option<i64>  }
+    JoinSession { user_id: String, active_cue: Option<i64>  },
+    GetShowData { data: ShowDetails }
+}
+
+async fn send_json<S, T>(writer: &mut S, payload: &T)
+where
+    S: SinkExt<Message> + Unpin,
+    S::Error: std::fmt::Display,
+    T: Serialize,
+{
+    match serde_json::to_string(payload) {
+        Ok(json_text) => {
+            if let Err(e) = writer.send(Message::Text(json_text)).await {
+                eprintln!("Failed to send WebSocket message: {}", e);
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to serialize response: {}", e);
+        }
+    }
 }
 
 // remember to call `.manage(MyState::default())`
 #[tauri::command]
-pub async fn start_session(show_id: i64, state: State<'_, AppState>) -> Result<String, String> {
+pub async fn start_session(show_id: i64, state: State<'_, AppState>, db_state: State<'_, db::DbState>) -> Result<String, String> {
     let mut session_guard = state.session.lock().unwrap();
     if session_guard.is_some() {
         return Err("Session already running".into());
@@ -65,6 +87,7 @@ pub async fn start_session(show_id: i64, state: State<'_, AppState>) -> Result<S
 
     let clients: Arc<Mutex<Vec<Client>>> = Arc ::new(Mutex::new(Vec::new()));
     let server_session_id = session_id.clone();
+    let db_arc = Arc::clone(&db_state.0);
 
     //spawn background websocket server
     tokio::spawn(async move {
@@ -75,8 +98,9 @@ pub async fn start_session(show_id: i64, state: State<'_, AppState>) -> Result<S
                 while let Ok((stream, _)) = listener.accept().await {
                     let clients_arc = Arc::clone(&clients);
                     let client_session_id = server_session_id.clone();
+                    let db = Arc::clone(&db_arc);
 
-                    let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
+                    let (_tx, mut _rx) = mpsc::unbounded_channel::<Message>();
 
                     tokio::spawn(async move {
                         if let Ok(ws_stream) = accept_async(stream).await {
@@ -94,26 +118,37 @@ pub async fn start_session(show_id: i64, state: State<'_, AppState>) -> Result<S
                             }
 
                             let (mut write, mut read) = ws_stream.split();
-                            while let Some(message) = read.next().await {
-                                match message {
-                                    Ok(msg) => {
-                                        if msg.is_text() {
-                                            let text = msg.to_text().unwrap_or_default();
-                                            println!("Received from client {}: {}", client.client_id, text);
 
-                                            let reply = format!("Server acknowledgment: {}", text);
-                                            if let Err(e) = write.send(Message::Text(reply)).await {
-                                                println!("Failed to send message: {}", e);
-                                                break;
-                                            }
-                                        } else if msg.is_close() {
-                                            break;
+                            while let Some(Ok(msg)) = read.next().await {
+                                if let Message::Text(text) = msg {
+                                    match serde_json::from_str::<ClientMessage>(&text){
+                                        Ok(ClientMessage::JoinSession { user_name, role_id }) => {
+                                            println!("User {} joined with role {:?}", user_name, role_id);
+
+                                            let response = ServerMessage::JoinSession {
+                                                user_id: client.client_id.clone(),
+                                                active_cue: None
+                                            };
+
+                                            send_json(&mut write, &response).await;
                                         }
-                                    }
 
-                                    Err(e) => {
-                                        println!("WebSocket read error: {}", e);
-                                        break;
+                                        Ok(ClientMessage::GetShowData) => {
+                                            match fetch_show_details(&db, show_id) {
+                                                Ok(show_details) => {
+                                                    let reponse = ServerMessage::GetShowData { data: show_details};
+                                                    send_json(&mut write, &reponse).await;
+                                                }
+
+                                                Err(err) => {
+                                                    eprintln!("Failed to fetch show details: {}", err)
+                                                }
+                                            }
+                                        }
+                                        
+                                        Err(err) => {
+                                            eprintln!("Invalid client message received: {}", err);
+                                        }
                                     }
                                 }
                             }
