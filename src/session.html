@@ -1,0 +1,117 @@
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Showfow Client</title>
+        <link rel="stylesheet" href="style/session.css">
+        <link rel="stylesheet" href="style/boxes.css">
+    </head>
+    <body>
+
+    <!-- Header Bar -->
+    <header>
+        <div class="show-title-group">
+            <h1 id="ShowName"></h1>
+        </div>
+        <div>
+            <button class="btn btn-muted" id="BtnFullscreen">Toggle Fullscreen</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- Left Workspace: Active Notes + Full Cue List -->
+        <section class="show-overview-section">
+            
+            <!-- CURRENT & NEXT CUE NOTES BANNER -->
+            <div class="cue-notes-panel">
+                <div class="note-card active">
+                    <div class="note-header active">
+                        <span>Current Cue Notes</span>
+                        <span>Cue 2</span>
+                    </div>
+                    <div class="note-title">Host Entrance & Welcome Speech</div>
+                    <div class="note-body">
+                        Lighting: Warm spotlight on Stage Left. <br>
+                        Sound: Fade background music down to 10% on podium mic un-mute.
+                    </div>
+                </div>
+
+                <div class="note-card next">
+                    <div class="note-header next">
+                        <span>Next Cue Notes</span>
+                        <span>Cue 3</span>
+                    </div>
+                    <div class="note-title">Musical Act 1 - Main Stage</div>
+                    <div class="note-body">
+                        Lighting: Cue blue wash overhead once host exits. <br>
+                        Stage: Standby band on Stage Right.
+                    </div>
+                </div>
+            </div>
+
+            <!-- FULL CUE LIST -->
+            <div class="section-header">
+                <h2>Full Script Sequence</h2>
+                <span id="itemCounter" style="color: var(--text-secondary); font-size: 0.8rem;"></span>
+            </div>
+            <div id="cueList" class="cue-list"></div>
+        </section>
+
+        <!-- Right: Control Sidebar -->
+        <aside class="sidebar">
+            
+            <!-- Controls Panel -->
+            <div class="panel">
+                <h3>Session Controls</h3>
+                <div class="control-grid">
+                    <button id="btnNextCue" class="btn btn-primary">NEXT CUE ▶</button>
+                    <button class="btn">◀ PREV</button>
+                    <button class="btn">PAUSE</button>
+                    <button class="btn btn-danger">END SESSION</button>
+                </div>
+            </div>
+
+            <!-- Connected Roles Panel -->
+            <div class="panel">
+                <h3>Connected Roles</h3>
+                <div class="role-list">
+                    <div class="role-item">
+                        <div class="role-details">
+                            <strong>Lighting Desk</strong>
+                            <span class="role-user">User: Alex_L</span>
+                        </div>
+                        <span class="status-dot online"></span>
+                    </div>
+
+                    <div class="role-item">
+                        <div class="role-details">
+                            <strong>Sound Engineer</strong>
+                            <span class="role-user">User: Sarah_S</span>
+                        </div>
+                        <span class="status-dot online"></span>
+                    </div>
+
+                    <div class="role-item">
+                        <div class="role-details">
+                            <strong>Stage Manager</strong>
+                            <span class="role-user">Unassigned</span>
+                        </div>
+                        <span class="status-dot offline"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- QR Code Connection Panel -->
+            <div class="panel">
+                <h3>Client Connection QR</h3>
+                <div class="qr-box" id="qr-container">
+                    <span style="color: #64748b; font-size: 0.8rem;">[ QR Code ]</span>
+                </div>
+            </div>
+
+        </aside>
+    </main>
+
+    <script src="js/dynamic_generator.js"></script>
+    <script src="js/session.js"></script>
+    </body>
+</html>

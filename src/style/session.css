@@ -1,0 +1,360 @@
+:root {
+    --bg-base: #111418;
+    --bg-surface: #1a1e24;
+    --bg-card: #232830;
+    --bg-card-hover: #2c333e;
+    --border-color: #2e3642;
+    --border-subtle: #222831;
+    
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+
+    --accent-green: #22c55e;
+    --accent-green-subtle: rgba(34, 197, 94, 0.12);
+    --accent-blue: #3b82f6;
+    --accent-blue-subtle: rgba(59, 130, 246, 0.12);
+    --accent-red: #ef4444;
+    --accent-red-subtle: rgba(239, 68, 68, 0.12);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    user-select: none;
+}
+
+body {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Top Header */
+header {
+    background-color: var(--bg-surface);
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.show-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.show-title-group h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.live-badge {
+    background-color: var(--accent-green-subtle);
+    color: var(--accent-green);
+    border: 1px solid var(--accent-green);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Button Primitives */
+.btn {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn:hover {
+    background-color: var(--bg-card-hover);
+    border-color: var(--text-muted);
+}
+
+.btn-muted {
+    background-color: transparent;
+    color: var(--text-secondary);
+    border-color: transparent;
+}
+
+.btn-muted:hover {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.btn-primary {
+    background-color: var(--accent-green);
+    border-color: var(--accent-green);
+    color: #051b0d;
+    font-weight: 700;
+    grid-column: span 2;
+    padding: 12px;
+    font-size: 0.95rem;
+}
+
+.btn-primary:hover {
+    background-color: #1ea34d;
+    border-color: #1ea34d;
+}
+
+.btn-danger {
+    background-color: var(--accent-red-subtle);
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+    grid-column: span 2;
+}
+
+.btn-danger:hover {
+    background-color: var(--accent-red);
+    color: #fff;
+}
+
+/* Main Workspace Grid */
+main {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 14px;
+    padding: 14px;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Left Column: Script & Cue Overview */
+.show-overview-section {
+    background-color: var(--bg-surface);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Live Cue Notes Banner */
+.cue-notes-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.note-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.note-card.active {
+    border-left: 3px solid var(--accent-green);
+    background-color: rgba(34, 197, 94, 0.04);
+}
+
+.note-card.next {
+    border-left: 3px solid var(--accent-blue);
+    background-color: rgba(59, 130, 246, 0.04);
+}
+
+.note-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.note-header.active { color: var(--accent-green); }
+.note-header.next { color: var(--accent-blue); }
+
+.note-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.note-body {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+    background-color: rgba(0, 0, 0, 0.15);
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+}
+
+.section-header {
+    padding: 10px 16px;
+    background-color: rgba(0, 0, 0, 0.15);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.section-header h2 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.cue-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cue-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-left: 3px solid transparent;
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cue-card.active {
+    border-left-color: var(--accent-green);
+    background-color: rgba(34, 197, 94, 0.08);
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+.cue-card.next {
+    border-left-color: var(--accent-blue);
+    background-color: rgba(59, 130, 246, 0.05);
+}
+
+.cue-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.cue-time {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+/* Right Sidebar Panels */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.panel {
+    background-color: var(--bg-surface);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.panel h3 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.control-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+/* Connected Roles List */
+.role-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.role-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background-color: var(--bg-card);
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+    font-size: 0.85rem;
+}
+
+.role-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.role-user {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-dot.online {
+    background-color: var(--accent-green);
+    box-shadow: 0 0 6px var(--accent-green);
+}
+
+.status-dot.offline {
+    background-color: var(--text-muted);
+}
+
+/* QR Code Container */
+.qr-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--bg-card); /* Matches the UI card background */
+    border: 1px solid var(--border-subtle);
+    padding: 12px;
+    border-radius: 6px;
+    min-height: 160px;
+}
+
+.qr-box svg {
+    filter: invert(1) hue-rotate(180deg);
+    mix-blend-mode: screen; /* Blends the inverted background */
+}

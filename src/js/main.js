@@ -22,9 +22,9 @@ function addShowItem(id, name, time){
     item.row.remove();
   });
 
-  item.editBtn.addEventListener("click", () => openEditShow(id, name));
+  item.editBtn.addEventListener("click", () => openEditShow(id));
 
-  item.startSession.addEventListener("click", () => startSession(id))
+  item.startSession.addEventListener("click", e => startSession(id, item.startSession))
 }
 
 btnAddShow.addEventListener("click", async () => {
@@ -46,14 +46,19 @@ btnAddShow.addEventListener("click", async () => {
   addShowItem(newShowId.id, newShowData.newShowName, unixTimestamp);
 });
 
-async function startSession(id){
+async function startSession(id, button){
   const sessionResponse = await invoke("start_session", {showId: id})
-  console.log(sessionResponse);
+  button.classList.add("session-active");
 }
 
 async function init(){
   shows = await invoke("get_shows");
   shows.forEach(show => addShowItem(show.id, show.name, show.time));
 }
+
+listen("session-stopped", () => {
+  const button = document.querySelector("svg.btn-icon.session-active");
+  button.classList.remove("session-active");
+})
 
 init();

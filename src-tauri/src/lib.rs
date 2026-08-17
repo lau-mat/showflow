@@ -2,8 +2,7 @@ mod db;
 mod session;
 
 use std::sync::{Arc, Mutex};
-use tauri::State;
-use tauri::Manager;
+use tauri::{State, Manager, Emitter};
 use tauri_plugin_opener;
 use serde::{Serialize, Deserialize};
 use rusqlite::Connection;
@@ -285,11 +284,30 @@ pub fn run() {
             app.manage(db::DbState(Arc::new(Mutex::new(conn))));
 
             app.manage(session::AppState {
-                session: Mutex::new(None),
-                shutdown_tx: Mutex::new(None),
+            session: Arc::new(Mutex::new(None)),
+                shutdown_tx: Mutex::new(None),  
             });
             
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                // Check if the closed window is the master window
+                if window.label() == "session-manager" {
+                    let state = window.state::<session::AppState>();
+
+                    if let Ok(mut session_guard) = state.session.lock() {
+                        *session_guard = None;
+                    }
+                    
+                    // Take the channel out and send the broadcast shutdown signal
+                    if let Some(tx) = state.shutdown_tx.lock().unwrap().take() {
+                        let _ = tx.send(()); // Triggers both rx_http and rx_ws
+                    };
+
+                    let _ = window.emit("session-stopped", ());
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             new_show,
@@ -301,7 +319,8 @@ pub fn run() {
             delete_scenario_line,
             add_scenario_line_comment,
             edit_scenario_line_comment,
-            session::start_session
+            session::start_session,
+            session::generate_server_qr
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

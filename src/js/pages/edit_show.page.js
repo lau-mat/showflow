@@ -186,26 +186,26 @@ async function addLine() {
     const lineCount = currentShowData ? currentShowData.lines.length + 1 : 1;
 
     const lineData = await dynamicPrompt({
-    title: "Add Scenario Line",
-    confirmText: "Add Line",
-    elements: [
-        // 1. Two-Column Row for Time Controls
-        {type: "div", classes: "form-row-2col", varId: "timeRow" },
-        
-        {type: "div", classes: "form-group", varId: "timeModeGroup", target: "@timeRow" },
-        {type: "select-label", label: "Time Mode", id: "timeReference", options: [
-            { type: "option", attributes: { value: "relative" }, text: "Relative (+00:00)" },
-            { type: "option", attributes: { value: "absolute" }, text: "Absolute (Clock)" }
-        ], target: "@timeModeGroup"},
+        title: "Add Scenario Line",
+        confirmText: "Add Line",
+        elements: [
+            // 1. Two-Column Row for Time Controls
+            {type: "div", classes: "form-row-2col", varId: "timeRow" },
+            
+            {type: "div", classes: "form-group", varId: "timeModeGroup", target: "@timeRow" },
+            {type: "select-label", label: "Time Mode", id: "timeReference", options: [
+                { type: "option", attributes: { value: "relative" }, text: "Relative (+00:00)" },
+                { type: "option", attributes: { value: "absolute" }, text: "Absolute (Clock)" }
+            ], target: "@timeModeGroup"},
 
-        {type: "div", classes: "form-group", varId: "timeValueGroup", target: "@timeRow" },
-        {type: "input-label", id: "timeValue", label: "Time / Offset", target: "@timeValueGroup"},
+            {type: "div", classes: "form-group", varId: "timeValueGroup", target: "@timeRow" },
+            {type: "input-label", id: "timeValue", label: "Time / Offset", target: "@timeValueGroup"},
 
-        // 2. Full-Width Main Fields (No target needed -> appends directly to modal body)
-        {type: "input-label", id: "lineName", label: "Cue Name", placeholder: "e.g., Intro Cue"},
-        {type: "textarea-label", id: "lineContent", label: "Cue Description", placeholder: "Enter cue description...", rows: 3}
-    ]
-});
+            // 2. Full-Width Main Fields (No target needed -> appends directly to modal body)
+            {type: "input-label", id: "lineName", label: "Cue Name", placeholder: "e.g., Intro Cue"},
+            {type: "textarea-label", id: "lineContent", label: "Cue Description", placeholder: "Enter cue description...", rows: 3}
+        ]
+    });
 
     if (!lineData || !lineData.lineContent) return;
 
