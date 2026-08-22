@@ -235,6 +235,7 @@ main {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .cue-card.active {
@@ -246,6 +247,11 @@ main {
 .cue-card.next {
     border-left-color: var(--accent-blue);
     background-color: rgba(59, 130, 246, 0.05);
+}
+
+.cue-card:hover {
+    background-color: var(--row-hover);
+    border-color: var(--border-color);
 }
 
 .cue-info {
@@ -292,7 +298,7 @@ main {
 }
 
 /* Connected Roles List */
-.role-list {
+#role-list {
     display: flex;
     flex-direction: column;
     gap: 6px;

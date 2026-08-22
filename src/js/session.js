@@ -12,7 +12,6 @@ const appWindow = getCurrentWindow();
 
 const elemShowName = document.getElementById("ShowName");
 const btnFullscreen = document.getElementById("BtnFullscreen");
-const elemCueList = document.getElementById("cueList");
 const elemItemCounter = document.getElementById("itemCounter");
 const btnNextCue = document.getElementById("btnNextCue");
 
@@ -61,19 +60,38 @@ ws.on("get_show_data", data => {
     loadQRCode();
     elemItemCounter.innerText = `${showData.lines.length} Items`;
 
-    showData.lines.forEach((line, index) => {
+    showData.lines.forEach(line => {
         generateDynamic([
-            {type: "div", classes: "cue-card", varId: "wrapper"},//classes: active, next
+            {type: "div", classes: "cue-card", data: {lineId: line.id}, style: {cursor: "pointer"}, events: {click: () => jumpToCue(line.id)}, varId: "wrapper"},//classes: active, next
             {type: "div", classes: "cue-info", target: "@wrapper", varId: "infoSection"},
-            {type: "span", classes: "cue-title", text: `Cue ${index + 1}: ${line.name}`, target: "@infoSection"},
+            {type: "span", classes: "cue-title", text: `Cue ${line.id}: ${line.name}`, target: "@infoSection"},
             {type: "span", classes: "cue-time", text: `Duration: ${line.time}`, target: "@infoSection"},
             {type: "span", text: "pending", style: {color: "var(--text-muted)", fontSize: "0.8rem"}, target: "@wrapper"} //class: live-badge
-        ], elemCueList);
+        ], "#cueList");
+    });
+
+    showData.roles.forEach(role => {
+        generateDynamic([
+            {type: "div", classes: "role-item", varId: "outerWrapper"},
+            {type: "div", classes: "role-details", varId: "wrapper", target: "@outerWrapper"},
+            {type: "strong", text: role.name, target: "@wrapper"},
+            {type: "span", classes: "role-user", text: "Users: -", data: {roleId: role.id}, target: "@wrapper"}
+        ], "#role-list");
     });
 });
 
 ws.on("get_session_data", data => {
     sessionData = data.session;
+    
+    sessionData.joined_users.forEach(user => {
+        const elem = document.querySelector(`.role-user[data-role-id="${user.client_role}"]`);
+        console.log(user);
+        if(elem.innerText === "Users: -"){
+            elem.innerText = `Users: ${user.client_name}`;
+        } else {
+            elem.innerText += `, ${user.client_name}`;
+        }
+    });
 });
 
 ws.on("join_session", data => sessionData.joined_users.push(data));
@@ -85,6 +103,10 @@ async function loadQRCode() {
     } catch (err) {
         console.error("Failed to generate QR code:", err);
     }
+}
+
+function jumpToCue(cueId){
+    console.log(`Jump to cue ${cueId}`)
 }
 
 btnNextCue.addEventListener("click", () => {
