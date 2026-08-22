@@ -55,9 +55,10 @@ pub enum ClientMessage {
 #[derive(Serialize, Clone, Debug)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum ServerMessage {
-    JoinSession { user_id: String, user_name: String, role_id: i64 },
+    JoinSession { client_id: String, client_name: String, client_role: i64 },
     GetShowData { data: ShowDetails },
     GetSessionData { session: Session },
+    CueChanged { current_cue: i64, next_cue: Option<i64> },
     Error { message: String }
 }
 
@@ -144,10 +145,10 @@ async fn handle_client_message(
                 }
             }
 
-            MessageResponse::Send(ServerMessage::JoinSession {
-                user_id: updated_client.client_id.clone(),
-                user_name: updated_client.client_name.clone().unwrap_or_default(),
-                role_id: updated_client.client_role.unwrap_or(0),
+            MessageResponse::Broadcast(ServerMessage::JoinSession {
+                client_id: updated_client.client_id.clone(),
+                client_name: updated_client.client_name.clone().unwrap_or_default(),
+                client_role: updated_client.client_role.unwrap_or_default(),
             })
         }
 
@@ -172,7 +173,7 @@ async fn handle_client_message(
             let mut session_guard = session.lock().unwrap();
             if let Some(s) = &mut *session_guard {
                 s.current_cue = Some(s.current_cue.map_or(1, |c| c + 1));
-                MessageResponse::Broadcast(ServerMessage::GetSessionData { session: s.clone() })
+                MessageResponse::Broadcast(ServerMessage::CueChanged { current_cue: s.current_cue.unwrap_or(0), next_cue: s.current_cue.map(|c| c + 1) })
             } else {
                 MessageResponse::Error("No active session found".to_string())
             }

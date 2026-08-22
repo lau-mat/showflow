@@ -83,18 +83,25 @@ ws.on("get_show_data", data => {
 ws.on("get_session_data", data => {
     sessionData = data.session;
     
-    sessionData.joined_users.forEach(user => {
-        const elem = document.querySelector(`.role-user[data-role-id="${user.client_role}"]`);
-        console.log(user);
-        if(elem.innerText === "Users: -"){
-            elem.innerText = `Users: ${user.client_name}`;
-        } else {
-            elem.innerText += `, ${user.client_name}`;
-        }
-    });
+    sessionData.joined_users.forEach(user => addUserToElem(user.client_role, user.client_name));
 });
 
-ws.on("join_session", data => sessionData.joined_users.push(data));
+ws.on("join_session", data => {
+    console.log(data);
+    sessionData.joined_users.push(data);
+    addUserToElem(data.client_role, data.client_name);
+});
+
+function addUserToElem(role_id, user_name){
+    const elem = document.querySelector(`.role-user[data-role-id="${role_id}"]`);
+    if(!elem) return;
+
+    if(elem.innerText === "Users: -"){
+        elem.innerText = `Users: ${user_name}`;
+    } else {
+        elem.innerText += `, ${user_name}`;
+    }
+}
 
 async function loadQRCode() {
     try {

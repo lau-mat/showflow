@@ -204,3 +204,318 @@ body {
 .btn-muted:hover polyline {
   stroke: var(--text-main) !important;
 }
+
+/* ── Live View Layout ─────────────────────────────────────────────────────── */
+#chApp.ch-layout {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    overflow: hidden;
+    z-index: 0;
+}
+
+/* Header */
+.ch-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background-color: var(--bg-surface);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.ch-show-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ch-show-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ch-live-badge {
+    background-color: var(--accent-green-subtle);
+    color: var(--accent-green);
+    border: 1px solid var(--accent-green);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+.ch-clock {
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-primary);
+}
+
+/* Body */
+.ch-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Sidebar */
+.ch-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-surface);
+    border-right: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.ch-sidebar-head {
+    padding: 10px 14px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.ch-cue-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.ch-cue-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    transition: background 0.1s;
+}
+
+.ch-cue-item.ch-cue-done {
+    opacity: 0.3;
+}
+
+.ch-cue-item.ch-cue-active {
+    background-color: var(--accent-green-subtle);
+    border-color: var(--accent-green);
+}
+
+.ch-cue-item.ch-cue-next {
+    background-color: var(--accent-blue-subtle);
+    border-color: var(--accent-blue);
+}
+
+.ch-cue-num {
+    font-family: ui-monospace, monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    width: 1.6rem;
+}
+
+.ch-cue-name {
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ch-cue-time {
+    font-family: ui-monospace, monospace;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+/* Content column */
+.ch-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 14px;
+    overflow-y: auto;
+}
+
+/* Standby */
+.ch-standby {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 1rem;
+    padding: 40px;
+}
+
+/* Current Cue — large focus card */
+.ch-current-card {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--accent-green);
+    border-radius: 8px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.ch-cur-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.ch-cur-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent-green);
+    background-color: var(--accent-green-subtle);
+    border: 1px solid var(--accent-green);
+    padding: 3px 10px;
+    border-radius: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.ch-cur-title {
+    flex: 1;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.ch-cur-time {
+    font-family: ui-monospace, monospace;
+    font-size: 1.15rem;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.ch-cur-desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+}
+
+/* Next Cue — compact card */
+.ch-next-card {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--accent-blue);
+    border-radius: 8px;
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ch-next-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ch-next-badge {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent-blue);
+    background-color: var(--accent-blue-subtle);
+    border: 1px solid var(--accent-blue);
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.ch-next-name {
+    flex: 1;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.ch-next-times {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.ch-next-time-label {
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.ch-countdown {
+    font-family: ui-monospace, monospace;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+    background-color: var(--accent-blue-subtle);
+    border: 1px solid var(--accent-blue);
+    padding: 2px 10px;
+    border-radius: 6px;
+}
+
+/* Note cards */
+.ch-note {
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.ch-note-general {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+}
+
+.ch-note-personal {
+    background-color: var(--accent-blue-subtle);
+    border: 1px solid var(--accent-blue);
+}
+
+.ch-note-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.ch-note-general  .ch-note-label { color: var(--text-muted); }
+.ch-note-personal .ch-note-label { color: var(--accent-blue); }
+
+.ch-note-body {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+}
+
+.ch-note-sm .ch-note-body {
+    font-size: 0.8rem;
+}
