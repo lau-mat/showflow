@@ -1,61 +1,7 @@
 /* ==========================================================================
    1. Design Tokens
    ========================================================================== */
-:root {
-  /* Light Theme */
-  --bg-color: #f4f4f5;
-  --surface-color: #ffffff;
-  --border-color: #e4e4e7;
-  --text-main: #18181b;
-  --text-muted: #71717a;
-  
-  --header-bg: #f4f4f5;
-  --accent-color: #d97706; /* Warm Amber */
-  --accent-hover: #b45309;
-  --row-hover: #fafafa;
-
-  --modal-overlay: rgba(0, 0, 0, 0.4);
-  --error-color: #ef4444;
-
-  --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  --modal-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  --radius: 10px;
-  
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-
-  --btn-primary-border: rgba(217, 119, 6, 0.35);
-  --btn-danger-border: rgba(239, 68, 68, 0.35);
-  --btn-primary-glow: rgba(217, 119, 6, 0.2);
-  --btn-danger-glow: rgba(239, 68, 68, 0.2);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Dark Theme (Rebalanced around #19191c) */
-    --bg-color: #19191c;        /* Base background */
-    --surface-color: #212126;   /* Card & modal surface */
-    --border-color: #2e2e35;    /* Subtle card & cell separation */
-    --text-main: #f4f4f6;       /* Crisp text */
-    --text-muted: #93939e;      /* Muted text */
-    
-    --header-bg: #27272d;       /* Sticky header row */
-    --accent-color: #f59e0b;    /* Warm Amber */
-    --accent-hover: #fbbf24;
-    --row-hover: #28282f;       /* Row hover state */
-
-    --modal-overlay: rgba(0, 0, 0, 0.7);
-    --error-color: #f87171;
-
-    --shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    --modal-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
-
-    --btn-primary-border: rgba(245, 158, 11, 0.35);
-    --btn-danger-border: rgba(248, 113, 113, 0.35);
-    --btn-primary-glow: rgba(245, 158, 11, 0.25);
-    --btn-danger-glow: rgba(248, 113, 113, 0.25);
-  }
-}
+@import "./colors.css";
 
 /* ==========================================================================
    2. Absolute Center Layout
@@ -143,7 +89,7 @@ main {
   flex: 1;
   min-width: 0;
   background-color: var(--surface-color);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   
@@ -166,13 +112,13 @@ th {
   color: var(--text-main);
   font-weight: 600;
   padding: 0.85rem 1rem;
-  border-bottom: 2px solid var(--border-color);
+  border-bottom: 2px solid var(--border-light);
   z-index: 10;
 }
 
 td {
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-light);
   color: var(--text-main);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -212,7 +158,7 @@ tfoot {
 
 td.create-show-cell {
   padding: 0;
-  border-top: 2px solid var(--border-color);
+  border-top: 2px solid var(--border-light);
   border-bottom: none;
 }
 
@@ -385,7 +331,7 @@ td.create-show-cell {
 /* Secondary / Muted */
 .btn-outline-secondary {
   background-color: transparent;
-  border-color: var(--border-color);
+  border-color: var(--border-light);
   color: var(--text-muted);
 }
 .btn-outline-secondary path, .btn-outline-secondary circle { stroke: var(--text-muted) !important; }
@@ -449,7 +395,7 @@ td.create-show-cell {
 #editShows::-webkit-scrollbar-thumb,
 .modal-content::-webkit-scrollbar-thumb,
 .boxBody::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: var(--border-light);
   border-radius: 4px;
 }
 
@@ -556,7 +502,7 @@ td.create-show-cell {
 
 .editor-card {
   background-color: var(--surface-color);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius);
   padding: 1.25rem;
   display: flex;
@@ -593,7 +539,7 @@ td.create-show-cell {
 
 .role-badge {
   background-color: var(--header-bg);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-light);
   color: var(--text-main);
   font-size: 0.8rem;
   font-weight: 500;
@@ -611,7 +557,7 @@ td.create-show-cell {
 .show-editor-main {
   flex: 1;
   background-color: var(--surface-color);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius);
   padding: 1.25rem;
   display: flex;
@@ -628,7 +574,7 @@ td.create-show-cell {
   flex: 1;
   min-height: 0;       /* CRITICAL: Shrinks dynamically as window decreases */
   overflow-y: auto;    /* ONLY table content scrolls! */
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-light);
   border-radius: calc(var(--radius) - 2px);
   position: relative;
 }
@@ -644,7 +590,7 @@ td.create-show-cell {
   top: 0;
   background-color: var(--header-bg);
   z-index: 10;
-  box-shadow: 0 1px 0 var(--border-color);
+  box-shadow: 0 1px 0 var(--border-light);
 }
 
 .lines-table td, 
@@ -781,7 +727,7 @@ td.create-show-cell {
   gap: 0.5rem;
   padding: 0.35rem 0.6rem;
   background-color: var(--header-bg);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius);
   transition: all 0.2s ease;
 }

@@ -1,22 +1,4 @@
-:root {
-    --bg-base: #111418;
-    --bg-surface: #1a1e24;
-    --bg-card: #232830;
-    --bg-card-hover: #2c333e;
-    --border-color: #2e3642;
-    --border-subtle: #222831;
-    
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-
-    --accent-green: #22c55e;
-    --accent-green-subtle: rgba(34, 197, 94, 0.12);
-    --accent-blue: #3b82f6;
-    --accent-blue-subtle: rgba(59, 130, 246, 0.12);
-    --accent-red: #ef4444;
-    --accent-red-subtle: rgba(239, 68, 68, 0.12);
-}
+@import "./colors.css";
 
 * {
     box-sizing: border-box;
@@ -27,8 +9,8 @@
 }
 
 body {
-    background-color: var(--bg-base);
-    color: var(--text-primary);
+    background-color: var(--bg-color);
+    color: var(--text-main);
     height: 100vh;
     display: flex;
     flex-direction: column;
@@ -37,7 +19,7 @@ body {
 
 /* Top Header */
 header {
-    background-color: var(--bg-surface);
+    background-color: var(--surface-color);
     padding: 10px 20px;
     display: flex;
     justify-content: space-between;
@@ -58,9 +40,9 @@ header {
 }
 
 .live-badge {
-    background-color: var(--accent-green-subtle);
-    color: var(--accent-green);
-    border: 1px solid var(--accent-green);
+    background-color: var(--accent-color-subtle);
+    color: var(--accent-color);
+    border: 1px solid var(--accent-color);
     padding: 2px 8px;
     border-radius: 12px;
     font-size: 0.7rem;
@@ -103,9 +85,8 @@ header {
 }
 
 .btn-primary {
-    background-color: var(--accent-green);
-    border-color: var(--accent-green);
-    color: #051b0d;
+    border-color: var(--btn-primary-border);
+    color: var(--text-primary);
     font-weight: 700;
     grid-column: span 2;
     padding: 12px;
@@ -113,8 +94,21 @@ header {
 }
 
 .btn-primary:hover {
-    background-color: #1ea34d;
-    border-color: #1ea34d;
+    background-color: var(--btn-primary-glow);
+}
+
+.btn-success {
+    background-color: var(--btn-primary-good);
+    border-color: var(--btn-primary-good-border);
+    color: var(--text-primary);
+    font-weight: 700;
+    grid-column: span 2;
+    padding: 12px;
+    font-size: 0.95rem;
+}
+
+.btn-success:hover {
+    background-color: var(--btn-primary-good-glow);
 }
 
 .btn-danger {

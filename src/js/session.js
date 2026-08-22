@@ -74,8 +74,9 @@ ws.on("get_show_data", data => {
 
 ws.on("get_session_data", data => {
     sessionData = data.session;
-    console.log(sessionData);
 });
+
+ws.on("join_session", data => sessionData.joined_users.push(data));
 
 async function loadQRCode() {
     try {

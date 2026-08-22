@@ -20,13 +20,13 @@ use qrcode::QrCode;
 use qrcode::render::svg;
 use local_ip_address::local_ip;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Session {
     pub session_id: String,
     pub show_id: i64,
     pub is_active: bool,
     pub current_cue: Option<i64>,
-    pub joined_users: Vec<String>,
+    pub joined_users: Vec<Client>,
 }
 
 pub struct AppState {
@@ -34,11 +34,12 @@ pub struct AppState {
     pub shutdown_tx: Mutex<Option<tokio::sync::broadcast::Sender<()>>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Client {
     pub client_id: String,
     pub client_name: Option<String>,
     pub client_role: Option<i64>,
+    #[serde(skip)]
     pub sender: mpsc::UnboundedSender<Message>,
 }
 
@@ -51,10 +52,10 @@ pub enum ClientMessage {
     NextCue
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum ServerMessage {
-    JoinSession { user_id: String, active_cue: Option<i64>  },
+    JoinSession { user_id: String, user_name: String, role_id: i64 },
     GetShowData { data: ShowDetails },
     GetSessionData { session: Session },
     Error { message: String }
@@ -103,6 +104,82 @@ where
     }
 }
 
+enum MessageResponse {
+    Send(ServerMessage),
+    Broadcast(ServerMessage),
+    Error(String),
+}
+
+async fn handle_client_message(
+    message: ClientMessage,
+    client: &Client,
+    db: &Arc<Mutex<rusqlite::Connection>>,
+    show_id: i64,
+    session: &Arc<Mutex<Option<Session>>>,
+    clients: &Arc<Mutex<Vec<Client>>>,
+) -> MessageResponse {
+    match message {
+        ClientMessage::JoinSession { user_name, role_id } => {
+            println!("User {} joined with role {:?}", user_name, role_id);
+
+            let updated_client = {
+                let mut guard = clients.lock().unwrap();
+                if let Some(c) = guard.iter_mut().find(|c| c.client_id == client.client_id) {
+                    c.client_name = Some(user_name.clone());
+                    c.client_role = role_id;
+                    c.clone()
+                } else {
+                    client.clone()
+                }
+            };
+
+            {
+                let mut session_guard = session.lock().unwrap();
+                if let Some(s) = &mut *session_guard {
+                    if let Some(existing) = s.joined_users.iter_mut().find(|u| u.client_id == client.client_id) {
+                        *existing = updated_client.clone();
+                    } else {
+                        s.joined_users.push(updated_client.clone());
+                    }
+                }
+            }
+
+            MessageResponse::Send(ServerMessage::JoinSession {
+                user_id: updated_client.client_id.clone(),
+                user_name: updated_client.client_name.clone().unwrap_or_default(),
+                role_id: updated_client.client_role.unwrap_or(0),
+            })
+        }
+
+        ClientMessage::GetShowData => {
+            match fetch_show_details(db, show_id) {
+                Ok(show_details) => MessageResponse::Send(ServerMessage::GetShowData { data: show_details }),
+                Err(err) => MessageResponse::Error(format!("Failed to fetch show details: {}", err)),
+            }
+        }
+
+        ClientMessage::GetSessionData => {
+            let session_guard = session.lock().unwrap();
+            if let Some(s) = &*session_guard {
+                MessageResponse::Send(ServerMessage::GetSessionData { session: s.clone() })
+            } else {
+                MessageResponse::Error("No active session found".to_string())
+            }
+        }
+
+        ClientMessage::NextCue => {
+            println!("Client {} requested next cue", client.client_id);
+            let mut session_guard = session.lock().unwrap();
+            if let Some(s) = &mut *session_guard {
+                s.current_cue = Some(s.current_cue.map_or(1, |c| c + 1));
+                MessageResponse::Broadcast(ServerMessage::GetSessionData { session: s.clone() })
+            } else {
+                MessageResponse::Error("No active session found".to_string())
+            }
+        }
+    }
+}
+
 async fn broadcast_json<T>(clients: &Arc<Mutex<Vec<Client>>>, payload: &T)
 where
     T: Serialize,
@@ -134,7 +211,7 @@ where
 }
 
 #[derive(RustEmbed, Clone)]
-#[folder = "../client_source/"]
+#[folder = "../src/"]
 struct Asset;
 
 async fn static_handler(uri: Uri) -> impl IntoResponse {
@@ -142,7 +219,7 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
 
     // Default to index.html for root requests
     if path.is_empty() {
-        path = "index.html".to_string();
+        path = "client.html".to_string();
     }
 
     match Asset::get(&path) {
@@ -237,67 +314,13 @@ pub async fn start_session(show_id: i64, state: State<'_, AppState>, db_state: S
                                             _ => break,
                                         };
                                         match serde_json::from_str::<ClientMessage>(&text) {
-                                            Ok(ClientMessage::JoinSession { user_name, role_id }) => {
-                                                println!("User {} joined with role {:?}", user_name, role_id);
-
-                                                let response = ServerMessage::JoinSession {
-                                                    user_id: client.client_id.clone(),
-                                                    active_cue: None
-                                                };
-
-                                                send_json(&mut write, &response).await;
-                                            }
-
-                                            Ok(ClientMessage::GetShowData) => {
-                                                match fetch_show_details(&db, show_id) {
-                                                    Ok(show_details) => {
-                                                        let reponse = ServerMessage::GetShowData { data: show_details };
-                                                        send_json(&mut write, &reponse).await;
-                                                    }
-                                                    Err(err) => {
-                                                        let error_msg = format!("Failed to fetch show details: {}", err);
-                                                        send_error(&mut write, &error_msg).await;
-                                                    }
+                                            Ok(msg) => {
+                                                match handle_client_message(msg, &client, &db, show_id, &session_for_client, &clients_arc).await {
+                                                    MessageResponse::Send(resp) => send_json(&mut write, &resp).await,
+                                                    MessageResponse::Broadcast(resp) => broadcast_json(&clients_arc, &resp).await,
+                                                    MessageResponse::Error(err) => send_error(&mut write, &err).await,
                                                 }
                                             }
-
-                                            Ok(ClientMessage::GetSessionData) => {
-                                                let response = {
-                                                    let session_guard = session_for_client.lock().unwrap();
-                                                    if let Some(session) = &*session_guard {
-                                                        Ok(ServerMessage::GetSessionData { session: session.clone() })
-                                                    } else {
-                                                        Err("No active session found".to_string())
-                                                    }
-                                                };
-
-                                                match response {
-                                                    Ok(resp) => send_json(&mut write, &resp).await,
-                                                    Err(err) => send_error(&mut write, &err).await,
-                                                }
-                                            }
-
-                                            Ok(ClientMessage::NextCue) => {
-                                                let response = {
-                                                    let mut session_guard = session_for_client.lock().unwrap();
-                                                    if let Some(session) = &mut *session_guard {
-                                                        if let Some(current_cue) = session.current_cue {
-                                                            session.current_cue = Some(current_cue + 1);
-                                                        } else {
-                                                            session.current_cue = Some(1);
-                                                        }
-                                                        Ok(ServerMessage::GetSessionData { session: session.clone() })
-                                                    } else {
-                                                        Err("No active session found".to_string())
-                                                    }
-                                                };
-                                                println!("Client {} requested next cue", client.client_id);
-                                                match response {
-                                                    Ok(resp) => broadcast_json(&clients_arc, &resp).await,
-                                                    Err(err) => send_error(&mut write, &err).await,
-                                                }
-                                            }
-
                                             Err(err) => {
                                                 let error_msg = format!("Invalid client message received: {}", err);
                                                 send_error(&mut write, &error_msg).await;

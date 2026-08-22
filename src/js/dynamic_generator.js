@@ -349,9 +349,10 @@ const dynamicPrompt = ({
     cancelText = "Cancel", 
     onConfirm, 
     onCancel, 
-    onValidate = null 
+    onValidate = null,
+    required = false
 }) => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         let promptDialog;
 
         const clearErrors = (modalEl) => {
@@ -362,6 +363,7 @@ const dynamicPrompt = ({
         const handleCancel = () => {
             promptDialog.close();
             if (onCancel) onCancel();
+            reject(new Error("Cancelled"));
         };
 
         const handleConfirm = () => {
@@ -407,13 +409,13 @@ const dynamicPrompt = ({
         const promptDefinition = [
             { type: "div", classes: "modal-body-wrapper", varId: "modalContent" },
             { type: "div", classes: "modal-footer", varId: "modalFooter" },
-            {
+            ...(!required ? [{
                 type: "button",
                 classes: ["btn", "btn-secondary"],
                 text: cancelText,
                 target: "@modalFooter",
                 events: { click: handleCancel }
-            },
+            }] : []),
             {
                 type: "button",
                 classes: ["btn", "btn-primary"],
@@ -429,8 +431,13 @@ const dynamicPrompt = ({
             content: promptDefinition,
             classes: ["modal-box"],
             isModal: true,
-            isTemporary: true
+            isTemporary: true,
+            closeOnOverlayClick: !required
         });
+
+        if (required) {
+            promptDialog.container.querySelector('.close-btn')?.remove();
+        }
 
         promptDialog.open();
     });
