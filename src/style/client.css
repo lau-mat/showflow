@@ -1,5 +1,6 @@
 @import "./colors.css";
 
+/* ── Reset & Baseline ─────────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -9,513 +10,479 @@
 html, body {
   height: 100vh;
   width: 100vw;
-  overflow: hidden; /* Prevents whole-page scrolling */
-}
-
-body {
-  font-family: var(--font-sans);
-  background-color: var(--bg-color);
-  color: var(--text-main);
-  
-  /* Perfect Vertical & Horizontal Centering */
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 2rem;
-  position: relative;
-
+  overflow: hidden;
+  background-color: #000000; /* Pure black backdrop for live performance screens */
+  color: #ffffff;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   user-select: none;
   -webkit-user-select: none;
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  box-sizing: border-box;
-}
-
-/* 2. Base SVG Icon Button Modifier (Overrides sizing, padding, & vector colors) */
-.btn-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+/* ── High-Contrast Live View Palette Override ────────────────────────────── */
+#chApp {
+  --ch-bg: #000000;
+  --ch-surface: #0a0a0c;
+  --ch-border: #27272a;
+  --ch-text: #ffffff;
+  --ch-muted: #a1a1aa;
   
-  /* Strictly locked dimensions */
-  width: 1.8rem;
-  height: 1.8rem;
-  min-width: 1.8rem;
-  min-height: 1.8rem;
-  max-width: 1.8rem;
-  max-height: 1.8rem;
-  flex-shrink: 0;
-  
-  padding: 0.35rem;
-  border-radius: calc(var(--radius) - 4px);
-  border: 1px solid transparent;
-  cursor: pointer;
-  box-sizing: border-box;
-  transition: all 0.15s ease;
+  /* Stage Teleprompter Signal Colors */
+  --ch-green: #22c55e;
+  --ch-green-glow: rgba(34, 197, 94, 0.25);
+  --ch-amber: #f59e0b;
+  --ch-amber-glow: rgba(245, 158, 11, 0.25);
+  --ch-blue: #3b82f6;
 }
 
-/* Dynamically bind SVG path colors to the button's CSS stroke/fill state */
-.btn-icon path,
-.btn-icon circle,
-.btn-icon rect,
-.btn-icon polygon,
-.btn-icon line,
-.btn-icon polyline {
-  vector-effect: non-scaling-stroke;
-  transition: stroke 0.15s ease, fill 0.15s ease;
+/* Flash animation for cue trigger */
+@keyframes chCueFlash {
+  0%   { border-color: var(--ch-green); box-shadow: 0 0 20px var(--ch-green); }
+  100% { border-color: var(--ch-green); box-shadow: 0 0 0 0 transparent; }
 }
 
-.btn-primary {
-  background-color: rgb(85, 68, 46);
-  color: #ffffff;
-  border-color: var(--accent-color);
-}
-.btn-primary path, .btn-primary circle, .btn-primary polygon, .btn-primary line { stroke: var(--accent-color) !important; }
-
-.btn-primary:hover {
-  background-color: var(--accent-color);
+.ch-current-card.ch-flash {
+  animation: chCueFlash 0.5s ease-out forwards;
 }
 
-.btn-primary:hover path,
-.btn-primary:hover polygon {
-  stroke: #ffffff !important;
-  fill: #ffffff !important;
-}
-
-/* Primary Outline */
-.btn-outline-primary {
-  background-color: rgba(99, 102, 241, 0.08);
-  border-color: var(--accent-color);
-  color: var(--accent-color);
-}
-.btn-outline-primary path, .btn-outline-primary circle, .btn-outline-primary line { stroke: var(--accent-color) !important; }
-.btn-outline-primary:hover {
-  background-color: var(--accent-color);
-  border-color: var(--accent-color);
-  color: #ffffff;
-}
-.btn-outline-primary:hover path, .btn-outline-primary:hover circle, .btn-outline-primary:hover line { stroke: #ffffff !important; }
-
-
-/* Danger / Delete */
-.btn-danger {
-  background-color: rgba(239, 68, 68, 0.12); /* Soft translucent red tint */
-  border-color: rgba(239, 68, 68, 0.25);
-  color: #ffffff;
-  border-color: var(--error-color, #ef4444);
-}
-.btn-danger path, .btn-danger line, .btn-danger polyline { stroke: var(--error-color) !important; }
-
-.btn-danger:hover {
-  background-color: var(--error-color);
-  border-color: var(--error-color);
-  box-shadow: 0 0 8px var(--btn-danger-glow);
-}
-
-.btn-danger:hover path,
-.btn-danger:hover line,
-.btn-danger:hover polyline {
-  stroke: #ffffff !important;
-}
-
-/* Danger Outline (Soft Red Tint) */
-.btn-outline-danger {
-  background-color: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: var(--error-color, #ef4444);
-}
-.btn-outline-danger path, .btn-outline-danger line, .btn-outline-danger polyline { stroke: var(--error-color, #ef4444) !important; }
-.btn-outline-danger:hover {
-  background-color: var(--error-color, #ef4444);
-  border-color: var(--error-color, #ef4444);
-  color: #ffffff;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
-}
-.btn-outline-danger:hover path, .btn-outline-danger:hover line, .btn-outline-danger:hover polyline { stroke: #ffffff !important; }
-
-
-/* Success */
-.btn-outline-success {
-  background-color: rgba(34, 197, 94, 0.08);
-  border-color: rgba(34, 197, 94, 0.3);
-  color: #22c55e;
-}
-.btn-outline-success path, .btn-outline-success polygon { stroke: #22c55e !important; }
-.btn-outline-success:hover {
-  background-color: #22c55e;
-  border-color: #22c55e;
-  color: #ffffff;
-}
-.btn-outline-success:hover path, .btn-outline-success:hover polygon { stroke: #ffffff !important; }
-
-
-/* Secondary / Muted */
-.btn-outline-secondary {
-  background-color: transparent;
-  border-color: var(--border-light);
-  color: var(--text-muted);
-}
-.btn-outline-secondary path, .btn-outline-secondary circle { stroke: var(--text-muted) !important; }
-.btn-outline-secondary:hover {
-  background-color: var(--row-hover);
-  border-color: var(--text-main);
-  color: var(--text-main);
-}
-.btn-outline-secondary:hover path, .btn-outline-secondary:hover circle { stroke: var(--text-main) !important; }
-
-.btn-muted {
-  color: var(--text-muted);
-  border: 1px solid var(--text-muted);
-}
-
-/* Direct SVG path color mapping for .btn-muted */
-.btn-muted path, 
-.btn-muted circle, 
-.btn-muted rect, 
-.btn-muted polygon, 
-.btn-muted line, 
-.btn-muted polyline {
-  stroke: var(--text-muted) !important;
-}
-
-/* Hover state for .btn-muted */
-.btn-muted:hover {
-  background-color: var(--row-hover);
-  border-color: var(--text-main);
-  color: var(--text-main);
-}
-
-.btn-muted:hover path, 
-.btn-muted:hover circle, 
-.btn-muted:hover rect, 
-.btn-muted:hover polygon, 
-.btn-muted:hover line, 
-.btn-muted:hover polyline {
-  stroke: var(--text-main) !important;
-}
-
-/* ── Live View Layout ─────────────────────────────────────────────────────── */
+/* ── Main Layout ──────────────────────────────────────────────────────────── */
 #chApp.ch-layout {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    background-color: var(--bg-base);
-    color: var(--text-primary);
-    font-family: var(--font-sans);
-    overflow: hidden;
-    z-index: 0;
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--ch-bg);
+  color: var(--ch-text);
+  overflow: hidden;
+  padding: 6px;
+  gap: 6px;
 }
 
-/* Header */
+/* ── Stage Teleprompter Header ───────────────────────────────────────────── */
 .ch-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 20px;
-    background-color: var(--bg-surface);
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background-color: var(--ch-surface);
+  border: 1px solid var(--ch-border);
+  border-radius: 6px;
+  flex-shrink: 0;
+  gap: 12px;
 }
 
 .ch-show-meta {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
 .ch-show-name {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ch-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ch-live-badge {
-    background-color: var(--accent-green-subtle);
-    color: var(--accent-green);
-    border: 1px solid var(--accent-green);
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
+  background-color: #052e16;
+  color: var(--ch-green);
+  border: 1.5px solid var(--ch-green);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  box-shadow: 0 0 10px var(--ch-green-glow);
+}
+
+.ch-cue-counter {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--ch-amber);
+  background-color: #17120a;
+  border: 1px solid var(--ch-amber);
+  padding: 2px 10px;
+  border-radius: 4px;
 }
 
 .ch-clock {
-    font-family: ui-monospace, SFMono-Regular, monospace;
-    font-size: 1.4rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: #ffffff;
 }
 
-/* Body */
+/* ── Body (Sidebar + Cue Main) ────────────────────────────────────────────── */
 .ch-body {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  overflow: hidden;
+  min-height: 0;
 }
 
-/* Sidebar */
+/* ── Sidebar (Auto-cue sidebar list) ──────────────────────────────────────── */
 .ch-sidebar {
-    width: 220px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    background-color: var(--bg-surface);
-    border-right: 1px solid var(--border-color);
-    overflow: hidden;
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--ch-surface);
+  border: 1px solid var(--ch-border);
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .ch-sidebar-head {
-    padding: 10px 14px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0;
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ch-muted);
+  border-bottom: 1px solid var(--ch-border);
+  background-color: #121215;
 }
 
 .ch-cue-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .ch-cue-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 10px;
-    border-radius: 5px;
-    border: 1px solid transparent;
-    transition: background 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid #1c1c21;
+  background-color: #0d0d11;
 }
 
 .ch-cue-item.ch-cue-done {
-    opacity: 0.3;
+  opacity: 0.25;
+  filter: grayscale(1);
 }
 
 .ch-cue-item.ch-cue-active {
-    background-color: var(--accent-green-subtle);
-    border-color: var(--accent-green);
+  background-color: #041f0e;
+  border-color: var(--ch-green);
+  box-shadow: inset 0 0 10px var(--ch-green-glow);
+}
+
+.ch-cue-item.ch-cue-active .ch-cue-num,
+.ch-cue-item.ch-cue-active .ch-cue-name {
+  color: #ffffff;
+  font-weight: 800;
 }
 
 .ch-cue-item.ch-cue-next {
-    background-color: var(--accent-blue-subtle);
-    border-color: var(--accent-blue);
+  background-color: #1c1503;
+  border-color: var(--ch-amber);
+}
+
+.ch-cue-item.ch-cue-next .ch-cue-num,
+.ch-cue-item.ch-cue-next .ch-cue-name {
+  color: var(--ch-amber);
+  font-weight: 700;
 }
 
 .ch-cue-num {
-    font-family: ui-monospace, monospace;
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    flex-shrink: 0;
-    width: 1.6rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ch-muted);
+  width: 2rem;
 }
 
 .ch-cue-name {
-    font-size: 0.82rem;
-    color: var(--text-primary);
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  font-size: 0.95rem;
+  color: #e4e4e7;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ch-cue-time {
-    font-family: ui-monospace, monospace;
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    flex-shrink: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: var(--ch-muted);
 }
 
-/* Content column */
+/* ── Content Area (Confidence Monitor Layout) ────────────────────────────── */
 .ch-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 14px;
-    overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+  min-height: 0;
 }
 
-/* Standby */
 .ch-standby {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    font-size: 1rem;
-    padding: 40px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ch-muted);
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 2px dashed var(--ch-border);
+  border-radius: 6px;
 }
 
-/* Current Cue — large focus card */
+/* ── CURRENT SLIDE / CUE (GREEN BORDER - MAXIMUM VISIBILITY) ──────────────── */
+#chCurrentWrap {
+  flex: 1.2;
+  display: flex;
+  min-height: 0;
+}
+
 .ch-current-card {
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--accent-green);
-    border-radius: 8px;
-    padding: 20px 22px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
+  flex: 1;
+  background-color: #020b05;
+  border: 2px solid var(--ch-green);
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 0 15px var(--ch-green-glow);
+  position: relative;
+  overflow-y: auto;
 }
 
 .ch-cur-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .ch-cur-badge {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: var(--accent-green);
-    background-color: var(--accent-green-subtle);
-    border: 1px solid var(--accent-green);
-    padding: 3px 10px;
-    border-radius: 10px;
-    white-space: nowrap;
-    flex-shrink: 0;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: var(--ch-green);
+  background-color: #052e16;
+  border: 1px solid var(--ch-green);
+  padding: 4px 12px;
+  border-radius: 4px;
 }
 
 .ch-cur-title {
-    flex: 1;
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1.2;
+  font-size: clamp(2rem, 4vw, 4rem);
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
 }
 
 .ch-cur-time {
-    font-family: ui-monospace, monospace;
-    font-size: 1.15rem;
-    color: var(--text-secondary);
-    flex-shrink: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--ch-green);
 }
 
 .ch-cur-desc {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-    line-height: 1.55;
+  font-size: 1.2rem;
+  color: #d4d4d8;
+  line-height: 1.4;
 }
 
-/* Next Cue — compact card */
+/* ── NEXT SLIDE / CUE (AMBER BORDER) ─────────────────────────────────────── */
+#chNextWrap {
+  flex: 0.8;
+  display: flex;
+  min-height: 0;
+}
+
 .ch-next-card {
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--accent-blue);
-    border-radius: 8px;
-    padding: 14px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+  flex: 1;
+  background-color: #0c0902;
+  border: 2px solid var(--ch-amber);
+  border-radius: 8px;
+  padding: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 0 12px var(--ch-amber-glow);
 }
 
 .ch-next-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .ch-next-badge {
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: var(--accent-blue);
-    background-color: var(--accent-blue-subtle);
-    border: 1px solid var(--accent-blue);
-    padding: 2px 8px;
-    border-radius: 10px;
-    white-space: nowrap;
-    flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: var(--ch-amber);
+  background-color: #271a00;
+  border: 1px solid var(--ch-amber);
+  padding: 3px 10px;
+  border-radius: 4px;
 }
 
 .ch-next-name {
-    flex: 1;
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: var(--text-primary);
+  font-size: clamp(1.3rem, 2.5vw, 2.4rem);
+  font-weight: 800;
+  color: var(--ch-amber);
 }
 
 .ch-next-times {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .ch-next-time-label {
-    font-family: ui-monospace, monospace;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
+  font-family: ui-monospace, monospace;
+  font-size: 1.2rem;
+  color: var(--ch-muted);
 }
 
 .ch-countdown {
-    font-family: ui-monospace, monospace;
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--accent-blue);
-    background-color: var(--accent-blue-subtle);
-    border: 1px solid var(--accent-blue);
-    padding: 2px 10px;
-    border-radius: 6px;
+  font-family: ui-monospace, monospace;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ef4444;
+  background-color: #2b0808;
+  border: 1px solid #ef4444;
+  padding: 2px 12px;
+  border-radius: 4px;
 }
 
-/* Note cards */
+/* ── Note Cards (Teleprompter Style) ──────────────────────────────────────── */
 .ch-note {
-    border-radius: 6px;
-    padding: 10px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  border-left: 6px solid var(--ch-border);
 }
 
 .ch-note-general {
-    background-color: var(--bg-card);
-    border: 1px solid var(--border-subtle);
+  background-color: #121215;
+  border-left-color: var(--ch-muted);
 }
 
 .ch-note-personal {
-    background-color: var(--accent-blue-subtle);
-    border: 1px solid var(--accent-blue);
+  background-color: #08132b;
+  border-left-color: var(--ch-blue);
 }
 
 .ch-note-label {
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  display: block;
 }
 
-.ch-note-general  .ch-note-label { color: var(--text-muted); }
-.ch-note-personal .ch-note-label { color: var(--accent-blue); }
+.ch-note-general .ch-note-label { color: var(--ch-muted); }
+.ch-note-personal .ch-note-label { color: var(--ch-blue); }
 
 .ch-note-body {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-    line-height: 1.55;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.4;
 }
 
-.ch-note-sm .ch-note-body {
-    font-size: 0.8rem;
+/* ── Mobile/Tablet Bottom Cue Strip ──────────────────────────────────────── */
+.ch-cue-strip {
+  display: none;
+  overflow-x: auto;
+  background-color: var(--ch-surface);
+  border: 1px solid var(--ch-border);
+  border-radius: 6px;
+  padding: 6px;
+  gap: 6px;
+  flex-shrink: 0;
+  scroll-snap-type: x mandatory;
+}
+
+.ch-strip-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--ch-border);
+  background-color: #0f0f12;
+  min-width: 70px;
+  scroll-snap-align: center;
+}
+
+.ch-strip-item.ch-cue-done { opacity: 0.3; }
+.ch-strip-item.ch-cue-active { background-color: #041f0e; border-color: var(--ch-green); }
+.ch-strip-item.ch-cue-next   { background-color: #1c1503; border-color: var(--ch-amber); }
+
+.ch-strip-num {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+.ch-strip-name {
+  font-size: 0.75rem;
+  color: var(--ch-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+}
+
+/* ── Responsive Rules (Phones & Tablets) ─────────────────────────────────── */
+
+@media (min-width: 900px) {
+  .ch-cue-counter { display: none; }
+  .ch-cue-strip   { display: none !important; }
+}
+
+@media (max-width: 899px) {
+  /* Hide sidebar on mobile/tablet to maximize stage monitor size */
+  .ch-sidebar   { display: none; }
+  .ch-cue-strip { display: flex; }
+
+  .ch-header    { padding: 6px 10px; }
+  .ch-clock     { font-size: 1.2rem; }
+
+  .ch-content   { gap: 6px; }
+  
+  .ch-cur-title { font-size: clamp(1.6rem, 5vw, 2.5rem); }
+  .ch-next-name { font-size: clamp(1.2rem, 3.5vw, 1.8rem); }
+
+  .ch-current-card, .ch-next-card { padding: 10px 14px; }
+}
+
+@media (max-width: 480px) {
+  #chApp.ch-layout { padding: 4px; gap: 4px; }
+  .ch-show-name    { font-size: 0.85rem; }
+  .ch-live-badge   { font-size: 0.65rem; padding: 1px 5px; }
+  .ch-clock        { font-size: 1rem; }
+  .ch-note-body    { font-size: 0.95rem; }
 }

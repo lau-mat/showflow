@@ -14,6 +14,7 @@ const elemShowName = document.getElementById("ShowName");
 const btnFullscreen = document.getElementById("BtnFullscreen");
 const elemItemCounter = document.getElementById("itemCounter");
 const btnNextCue = document.getElementById("btnNextCue");
+const btnPreviousCue = document.getElementById("previousCue");
 
 ws.routes = {};
 
@@ -46,6 +47,32 @@ ws.onmessage = event => {
 
 ws.on("error", data => {
     throw new Error(`Backend error: ${data.message}`);
+});
+
+ws.on("cue_change", ({ current_cue, next_cue }) => {
+    sessionData.current_cue = current_cue;
+
+    // Reset all cards
+    document.querySelectorAll(".cue-card").forEach(el => {
+        el.classList.remove("active", "next");
+        const badge = el.querySelector("span:last-child");
+        if (badge) badge.textContent = "pending";
+    });
+
+    const sorted = [...showData.lines].sort((a, b) => a.order - b.order);
+    const activeId = sorted[current_cue - 1]?.id;
+    const nextId   = sorted[next_cue   - 1]?.id;
+
+    const activeCard = activeId != null ? document.querySelector(`.cue-card[data-line-id="${activeId}"]`) : null;
+    if (activeCard) {
+        activeCard.classList.add("active");
+        const badge = activeCard.querySelector("span:last-child");
+        if (badge) badge.textContent = "LIVE";
+        activeCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    const nextCard = nextId != null ? document.querySelector(`.cue-card[data-line-id="${nextId}"]`) : null;
+    if (nextCard) nextCard.classList.add("next");
 });
 
 btnFullscreen.addEventListener('click', async () => {
@@ -87,7 +114,6 @@ ws.on("get_session_data", data => {
 });
 
 ws.on("join_session", data => {
-    console.log(data);
     sessionData.joined_users.push(data);
     addUserToElem(data.client_role, data.client_name);
 });
@@ -112,10 +138,14 @@ async function loadQRCode() {
     }
 }
 
-function jumpToCue(cueId){
-    console.log(`Jump to cue ${cueId}`)
-}
-
 btnNextCue.addEventListener("click", () => {
     ws.emit("next_cue")
 } );
+
+btnPreviousCue.addEventListener("click", () => {
+    ws.emit("previous_cue");
+});
+
+function jumpToCue(cueId){
+    ws.emit("jump_to_cue", {cue_number: cueId});
+}

@@ -2,9 +2,13 @@
 const host = window.location.hostname;
 const ws = new WebSocket(`ws://${host}:23123`);
 
+let loginSend = false;
+
 ws.routes = {};
 let session = {
     roleId: null,
+    userName: null,
+    clientId: null,
     name: null,
     showContent: {},
     sessionData: {},
@@ -56,29 +60,62 @@ ws.on("get_session_data", data => {
         renderCueList(lines);
         renderCurrentCue(lines);
         renderNextCue(lines);
+        renderCueStrip(lines);
         return;
     }
     if(Object.keys(session.showContent).length !== 0) selectRole();
 });
 
-ws.on("join_session", ({command, ...user}) => session.sessionData.joined_users.push(user));
+ws.on("join_session", ({command, ...user}) => {
+    session.sessionData.joined_users.push(user);
+
+    if(!loginSend) return;
+    if(user.client_name !== session.userName || user.client_role !== session.roleId) return;
+    loginSend = false;
+    window.localStorage.setItem("client_id", user.client_id);
+    session.clientId = user.client_id;
+});
+
+ws.on("cue_change", ({ current_cue }) => {
+    session.sessionData.current_cue = current_cue;
+    const lines = sortedLines();
+    renderCueList(lines);
+    renderCurrentCue(lines);
+    renderNextCue(lines);
+    renderCueStrip(lines);
+});
+
+function checkAndRestoreExistingUser(){
+    const previeousClientId = window.localStorage.getItem("client_id");
+    if(!previeousClientId) return null;
+    return session.sessionData.joined_users.find(user => user.client_id === previeousClientId) || null;
+}
 
 async function selectRole(){
-    const roleOptions = session.showContent.roles.map(role => ({type: "option", text: role.name, attributes: {value: role.id}}));
+    const previousUser = checkAndRestoreExistingUser();
+    if(previousUser !==  null){
+        session.userName = previousUser.client_name;
+        session.roleId = previousUser.client_role;
+        session.clientId = previousUser.clientId;
+    } else {
+        const roleOptions = session.showContent.roles.map(role => ({type: "option", text: role.name, attributes: {value: role.id}}));
 
-    const {userName, roleId} = await dynamicPrompt({ 
-        title: "Select role",
-        confirmText: "Join",
-        required: true,
-        elements: [
-            {type: "input-label", label: "Name", id: "userName"},
-            {type: "select-label", label: "Role", id: "roleId", options: roleOptions}
-        ]
-    });
+        const {userName, roleId} = await dynamicPrompt({ 
+            title: "Select role",
+            confirmText: "Join",
+            required: true,
+            elements: [
+                {type: "input-label", label: "Name", id: "userName"},
+                {type: "select-label", label: "Role", id: "roleId", options: roleOptions}
+            ]
+        });
 
-    ws.emit("join_session", {user_name: userName, role_id: Number(roleId)});
+        loginSend = true;
+        session.roleId = Number(roleId);
+        session.userName = userName;
 
-    session.roleId = roleId;
+        ws.emit("join_session", {user_name: userName, role_id: Number(roleId)});
+    }
 
     buildStructure();
 }
@@ -168,6 +205,13 @@ function renderCueList(lines) {
 }
 
 function renderCurrentCue(lines) {
+    // Update header cue counter (visible on mobile)
+    const counter = document.getElementById("chCueCounter");
+    if (counter) {
+        const idx = currentIndex(lines);
+        counter.textContent = idx >= 0 ? `${idx + 1} / ${lines.length}` : `— / ${lines.length}`;
+    }
+
     const el = document.getElementById("chCurrentWrap");
     if (!el) return;
     cleanContainer(el);
@@ -189,6 +233,39 @@ function renderCurrentCue(lines) {
             ...noteNodes(line.id)
         ]
     }, el);
+
+    // Trigger brief flash to signal cue change
+    const card = el.querySelector(".ch-current-card");
+    if (card) {
+        card.classList.remove("ch-flash");
+        void card.offsetWidth; // force reflow
+        card.classList.add("ch-flash");
+    }
+}
+
+function renderCueStrip(lines) {
+    const el = document.getElementById("chCueStrip");
+    if (!el) return;
+    cleanContainer(el);
+    const cur = currentIndex(lines);
+    lines.forEach((line, i) => {
+        dynamicGenerator({
+            type: "div",
+            classes: [
+                "ch-strip-item",
+                ...(i < cur     ? ["ch-cue-done"]  : []),
+                ...(i === cur   ? ["ch-cue-active"] : []),
+                ...(i === cur+1 ? ["ch-cue-next"]   : [])
+            ],
+            children: [
+                { type: "span", classes: "ch-strip-num",  text: String(i + 1).padStart(2, "0") },
+                { type: "span", classes: "ch-strip-name", text: line.name }
+            ]
+        }, el);
+    });
+    // Auto-scroll active item into view
+    const active = el.querySelector(".ch-cue-active");
+    if (active) active.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
 }
 
 function renderNextCue(lines) {
@@ -244,6 +321,7 @@ function buildStructure() {
         { type: "div",    classes: "ch-show-meta",   target: "@hdr", varId: "meta" },
         { type: "span",   classes: "ch-show-name",   text: session.showContent.show.name, target: "@meta" },
         { type: "span",   classes: "ch-live-badge",  text: "LIVE", target: "@meta" },
+        { type: "span",   classes: "ch-cue-counter", id: "chCueCounter", text: "— / —", target: "@meta" },
         { type: "span",   classes: "ch-clock",       id: "chClock", target: "@hdr" },
 
         { type: "main",   classes: "ch-body",         varId: "body" },
@@ -254,12 +332,15 @@ function buildStructure() {
         { type: "div",    classes: "ch-content",     target: "@body", varId: "content" },
         { type: "div",    id: "chCurrentWrap",        target: "@content" },
         { type: "div",    id: "chNextWrap",           target: "@content" },
+
+        { type: "div",    classes: "ch-cue-strip",   id: "chCueStrip" },
     ], app);
 
     const lines = sortedLines();
     renderCueList(lines);
     renderCurrentCue(lines);
     renderNextCue(lines);
+    renderCueStrip(lines);
 
     const clockEl = document.getElementById("chClock");
     const tickClock = () => { if (clockEl) clockEl.textContent = new Date().toLocaleTimeString("en-GB"); };

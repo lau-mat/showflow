@@ -49,7 +49,9 @@ pub enum ClientMessage {
     JoinSession { user_name: String, role_id: Option<i64>},
     GetShowData,
     GetSessionData,
-    NextCue
+    NextCue,
+    PreviousCue,
+    JumpToCue { cue_number: i64 },
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -58,7 +60,7 @@ pub enum ServerMessage {
     JoinSession { client_id: String, client_name: String, client_role: i64 },
     GetShowData { data: ShowDetails },
     GetSessionData { session: Session },
-    CueChanged { current_cue: i64, next_cue: Option<i64> },
+    CueChange { current_cue: i64, next_cue: Option<i64> },
     Error { message: String }
 }
 
@@ -173,7 +175,29 @@ async fn handle_client_message(
             let mut session_guard = session.lock().unwrap();
             if let Some(s) = &mut *session_guard {
                 s.current_cue = Some(s.current_cue.map_or(1, |c| c + 1));
-                MessageResponse::Broadcast(ServerMessage::CueChanged { current_cue: s.current_cue.unwrap_or(0), next_cue: s.current_cue.map(|c| c + 1) })
+                MessageResponse::Broadcast(ServerMessage::CueChange { current_cue: s.current_cue.unwrap_or(0), next_cue: s.current_cue.map(|c| c + 1) })
+            } else {
+                MessageResponse::Error("No active session found".to_string())
+            }
+        }
+
+        ClientMessage::PreviousCue => {
+            println!("Client {} requested previous cue", client.client_id);
+            let mut session_guard = session.lock().unwrap();
+            if let Some(s) = &mut *session_guard {
+                s.current_cue = Some(s.current_cue.map_or(1, |c| if c > 1 { c - 1 } else { 1 }));
+                MessageResponse::Broadcast(ServerMessage::CueChange { current_cue: s.current_cue.unwrap_or(0), next_cue: s.current_cue.map(|c| c + 1) })
+            } else {
+                MessageResponse::Error("No active session found".to_string())
+            }
+        }
+
+        ClientMessage::JumpToCue { cue_number } => {
+            println!("Client {} requested jump to cue {}", client.client_id, cue_number);
+            let mut session_guard = session.lock().unwrap();
+            if let Some(s) = &mut *session_guard {
+                s.current_cue = Some(cue_number);
+                MessageResponse::Broadcast(ServerMessage::CueChange { current_cue: cue_number, next_cue: Some(cue_number + 1) })
             } else {
                 MessageResponse::Error("No active session found".to_string())
             }

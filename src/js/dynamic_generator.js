@@ -3,7 +3,8 @@ const svgNamespace = "http://www.w3.org/2000/svg";
 const validElementTypes = [ 
   'svg', 'code', 'li', 'strong', 'small', 'pre', 'textarea', 'nav', 'section', 
   'a', 'i', 'div', 'span', 'p', 'br', 'button', 'h1', 'h2', 'h3', 'input', 
-  'img', 'label', "table", "thead", "tbody", "select", "option", "tr", "td", "th", "aside", "ul"
+  'img', 'label', "table", "thead", "tbody", "select", "option", "tr", "td", "th", "aside", "ul",
+  "header", "main"
 ];
 
 const compoundComponents = {
