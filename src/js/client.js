@@ -347,3 +347,28 @@ function buildStructure() {
     tickClock();
     _clockInterval = setInterval(tickClock, 1000);
 }
+
+// ── Fullscreen on double-click / double-tap ───────────────────────────────
+(function () {
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+            document.exitFullscreen().catch(() => {});
+        }
+    }
+
+    // Desktop
+    document.addEventListener("dblclick", toggleFullscreen);
+
+    // Mobile — browsers don't reliably fire dblclick on touch
+    let _lastTap = 0;
+    document.addEventListener("touchend", e => {
+        const now = Date.now();
+        if (now - _lastTap < 300) {
+            e.preventDefault();
+            toggleFullscreen();
+        }
+        _lastTap = now;
+    }, { passive: false });
+}());
