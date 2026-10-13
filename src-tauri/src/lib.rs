@@ -35,8 +35,8 @@ pub struct ScenarioLine {
     pub order: i64,
     pub name: String,
     pub comment: String,
-    pub time: String,
-    pub time_mode: i64
+    pub duration: i64,
+    pub absolute_time: Option<i64>
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -82,7 +82,7 @@ pub fn fetch_show_details(db: &Arc<Mutex<Connection>>, show_id: i64) -> Result<S
 
     // 3. Fetch Scenario Lines for this show
     let mut lines_stmt = conn
-        .prepare("SELECT scenario_line_id, scenario_line_order, scenario_line_name, scenario_line_note, scenario_line_time, scenario_line_time_mode FROM show_scenario_line WHERE show_id = ?1 ORDER BY scenario_line_order ASC")
+        .prepare("SELECT scenario_line_id, scenario_line_order, scenario_line_name, scenario_line_note, scenario_line_duration, scenario_line_absolute_time FROM show_scenario_line WHERE show_id = ?1 ORDER BY scenario_line_order ASC")
         .map_err(|e| e.to_string())?;
 
     let lines = lines_stmt
@@ -92,8 +92,8 @@ pub fn fetch_show_details(db: &Arc<Mutex<Connection>>, show_id: i64) -> Result<S
                 order: row.get(1)?,
                 name: row.get(2)?,
                 comment: row.get(3)?,
-                time: row.get(4)?,
-                time_mode: row.get(5)?,
+                duration: row.get(4)?,
+                absolute_time: row.get(5)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -208,12 +208,12 @@ fn add_role(state: State<'_, db::DbState>, show_id: i64, role_name: &str) -> Res
 }
 
 #[tauri::command]
-fn add_scenario_line(state: State<'_, db::DbState>, show_id: i64, line_order: i64, line_name: &str, line_comment: &str, line_time: &str, line_time_mode: i64) -> Result<ScenarioLine, String> {
+fn add_scenario_line(state: State<'_, db::DbState>, show_id: i64, line_order: i64, line_name: &str, line_comment: &str, duration: i64, absolute_time: Option<i64>) -> Result<ScenarioLine, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
 
     conn.execute(
-        "INSERT INTO show_scenario_line (show_id, scenario_line_order, scenario_line_name, scenario_line_note, scenario_line_time, scenario_line_time_mode) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        rusqlite::params![show_id, line_order, line_name, line_comment, line_time, line_time_mode],
+        "INSERT INTO show_scenario_line (show_id, scenario_line_order, scenario_line_name, scenario_line_note, scenario_line_duration, scenario_line_absolute_time) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![show_id, line_order, line_name, line_comment, duration, absolute_time],
     ).map_err(|e| e.to_string())?;
 
     let line_id = conn.last_insert_rowid();
@@ -223,8 +223,8 @@ fn add_scenario_line(state: State<'_, db::DbState>, show_id: i64, line_order: i6
         order: line_order,
         name: line_name.to_string(),
         comment: line_comment.to_string(),
-        time: line_time.to_string(),
-        time_mode: line_time_mode,
+        duration,
+        absolute_time,
     };
     println!("New scenario line created: {} for show ID {}", scenario_line.name, show_id);
     Ok(scenario_line)

@@ -96,6 +96,7 @@
   overflow-y: auto; /* Standard prompts scroll their content if text is long */
   height: auto;     /* Hugs content naturally */
   flex: 1;
+  min-height: 0;
   padding: 1.25rem;
   box-sizing: border-box;
 }
@@ -185,6 +186,13 @@
 /* Multi-column Form Helpers */
 .form-row-2col {
   display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+.form-row-3col {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
   width: 100%;
 }

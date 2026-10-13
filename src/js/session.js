@@ -92,7 +92,7 @@ ws.on("get_show_data", data => {
             {type: "div", classes: "cue-card", data: {lineId: line.id}, style: {cursor: "pointer"}, events: {click: () => jumpToCue(line.id)}, varId: "wrapper"},//classes: active, next
             {type: "div", classes: "cue-info", target: "@wrapper", varId: "infoSection"},
             {type: "span", classes: "cue-title", text: `Cue ${line.id}: ${line.name}`, target: "@infoSection"},
-            {type: "span", classes: "cue-time", text: `Duration: ${line.time}`, target: "@infoSection"},
+            {type: "span", classes: "cue-time", text: `Duration: ${line.duration}s`, target: "@infoSection"},
             {type: "span", text: "pending", style: {color: "var(--text-muted)", fontSize: "0.8rem"}, target: "@wrapper"} //class: live-badge
         ], "#cueList");
     });

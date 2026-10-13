@@ -140,15 +140,6 @@ function getComment(lineId, roleId) {
         .find(c => c.line_id === lineId && c.role_id === roleId)?.comment ?? null;
 }
 
-function parseAbsoluteSeconds(timeStr) {
-    const [h, m] = timeStr.split(":").map(Number);
-    const now  = new Date();
-    const goal = new Date(now);
-    goal.setHours(h, m, 0, 0);
-    if (goal <= now) goal.setDate(goal.getDate() + 1);
-    return Math.max(0, Math.floor((goal - now) / 1000));
-}
-
 function fmtCountdown(secs) {
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
@@ -156,6 +147,33 @@ function fmtCountdown(secs) {
     return h > 0
         ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
         : `${m}:${String(s).padStart(2,"0")}`;
+}
+
+function formatCueTime(line) {
+    if (line.absolute_time != null) {
+        return new Date(Number(line.absolute_time) * 1000).toLocaleTimeString("en-GB", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false
+        });
+    }
+    return fmtCountdown(Number(line.duration));
+}
+
+function resolveCueStartTimestamp(lines, cueIndex) {
+    let nextStart = Number(session.showContent.show?.time);
+    if (!Number.isFinite(nextStart)) return null;
+
+    for (let index = 0; index <= cueIndex; index++) {
+        const line = lines[index];
+        const start = line.absolute_time == null ? nextStart : Number(line.absolute_time);
+        if (!Number.isFinite(start)) return null;
+        if (index === cueIndex) return start;
+        nextStart = start + Number(line.duration || 0);
+    }
+
+    return null;
 }
 
 function noteNodes(lineId, small = false) {
@@ -198,7 +216,7 @@ function renderCueList(lines) {
             children: [
                 { type: "span", classes: "ch-cue-num",  text: String(i + 1).padStart(2, "0") },
                 { type: "span", classes: "ch-cue-name", text: line.name },
-                { type: "span", classes: "ch-cue-time", text: line.time }
+                { type: "span", classes: "ch-cue-time", text: formatCueTime(line) }
             ]
         }, el);
     });
@@ -227,7 +245,7 @@ function renderCurrentCue(lines) {
             { type: "div", classes: "ch-cur-header", children: [
                 { type: "span", classes: "ch-cur-badge", text: `CUE ${idx + 1}` },
                 { type: "h2",   classes: "ch-cur-title", text: line.name },
-                { type: "span", classes: "ch-cur-time",  text: line.time }
+                { type: "span", classes: "ch-cur-time",  text: formatCueTime(line) }
             ]},
             ...(line.comment ? [{ type: "p", classes: "ch-cur-desc", text: line.comment }] : []),
             ...noteNodes(line.id)
@@ -276,7 +294,8 @@ function renderNextCue(lines) {
     const nextIdx = currentIndex(lines) + 1;
     if (nextIdx >= lines.length) return;
     const line = lines[nextIdx];
-    const hasCountdown = (line.time_mode === 1);
+    const cueStartTimestamp = resolveCueStartTimestamp(lines, nextIdx);
+    const hasCountdown = cueStartTimestamp != null;
 
     dynamicGenerator({
         type: "div", classes: "ch-next-card",
@@ -285,7 +304,7 @@ function renderNextCue(lines) {
                 { type: "span", classes: "ch-next-badge", text: "NEXT" },
                 { type: "span", classes: "ch-next-name",  text: line.name },
                 { type: "div",  classes: "ch-next-times", children: [
-                    { type: "span", classes: "ch-next-time-label", text: line.time },
+                    { type: "span", classes: "ch-next-time-label", text: formatCueTime(line) },
                     ...(hasCountdown ? [{ type: "span", classes: "ch-countdown", id: "chCountdown", text: "" }] : [])
                 ]}
             ]},
@@ -295,7 +314,9 @@ function renderNextCue(lines) {
 
     if (hasCountdown) {
         const cdEl = document.getElementById("chCountdown");
-        const tick = () => { if (cdEl) cdEl.textContent = fmtCountdown(parseAbsoluteSeconds(line.time)); };
+        const tick = () => {
+            if (cdEl) cdEl.textContent = fmtCountdown(Math.max(0, Math.floor(cueStartTimestamp - Date.now() / 1000)));
+        };
         tick();
         _countdownInterval = setInterval(tick, 1000);
     }

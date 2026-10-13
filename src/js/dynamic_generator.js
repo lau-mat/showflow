@@ -327,7 +327,7 @@ class BaseDialog {
     }
 
     open() {
-        this.container.style.display = "block";
+        this.container.style.display = "flex";
         DialogStack.push(this);
     }
 
@@ -359,12 +359,13 @@ const dynamicPrompt = ({
         const clearErrors = (modalEl) => {
             modalEl.querySelectorAll('.modal-error-message').forEach(el => el.remove());
             modalEl.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+            modalEl.querySelectorAll('[aria-invalid="true"]').forEach(el => el.removeAttribute('aria-invalid'));
         };
 
         const handleCancel = () => {
             promptDialog.close();
             if (onCancel) onCancel();
-            reject(new Error("Cancelled"));
+            resolve(null);
         };
 
         const handleConfirm = () => {
@@ -382,14 +383,24 @@ const dynamicPrompt = ({
                 const errors = onValidate(data);
                 if (errors && Object.keys(errors).length > 0) {
                     Object.keys(errors).forEach(inputId => {
-                        const inputEl = document.getElementById(inputId);
-                        if (inputEl) {
-                            inputEl.classList.add('invalid');
-                            dynamicGenerator({
+                        const errorTarget = modalEl.querySelector(`#${CSS.escape(inputId)}`);
+                        if (errorTarget) {
+                            const fieldGroup = errorTarget.closest('.form-group') || errorTarget.parentElement;
+                            const controls = errorTarget.matches('input, select, textarea')
+                                ? [errorTarget]
+                                : Array.from(fieldGroup.querySelectorAll('input, select, textarea'));
+
+                            controls.forEach(control => {
+                                control.classList.add('invalid');
+                                control.setAttribute('aria-invalid', 'true');
+                            });
+
+                            const errorMessage = dynamicGenerator({
                                 type: 'span',
                                 classes: 'modal-error-message',
                                 text: errors[inputId]
-                            }, inputEl.parentNode);
+                            }, fieldGroup);
+                            errorMessage.setAttribute('role', 'alert');
                         }
                     });
                     return;

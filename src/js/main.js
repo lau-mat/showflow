@@ -35,8 +35,16 @@ btnAddShow.addEventListener("click", async () => {
         {type: "input-label", id: "newShowName", label: "Show name"},
         {type: "label", attributes: {for: "newShowTime"}, text: "Show time"},
         {type: "input", attributes: {type: "datetime-local"}, id: "newShowTime"}
-    ]
+    ],
+    onValidate: data => {
+      let errors = {};
+      if(!data.newShowName) errors.newShowName = "Please fill in a name";
+      if(!data.newShowTime) errors.newShowTime = "A start time must be selected";
+      return errors;
+    }
   });
+
+  if(!newShowData) return;
 
   const unixTimestamp = Math.floor(new Date(newShowData.newShowTime).getTime() / 1000);
 

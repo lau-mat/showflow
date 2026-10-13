@@ -130,13 +130,30 @@ function sortCommentsByRole(comments) {
         return a.role_id - b.role_id; // 4. Both have numeric IDs -> standard ascending numerical sort
     });
 }
+
+function formatScenarioLineTime(line) {
+    if (line.absolute_time != null) {
+        return new Date(Number(line.absolute_time) * 1000).toLocaleTimeString("en-GB", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false
+        });
+    }
+
+    const duration = Number(line.duration);
+    const hours = Math.floor(duration / 3600);
+    const minutes = Math.floor((duration % 3600) / 60);
+    const seconds = duration % 60;
+    return `+${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
     
 function buildLineRow(line, allComments, allRoles) {
     const lineComments = allComments.filter(c => c.line_id === line.id);
 
     let content = [
         {type: "tr", target: "@tableBody", data: {id: line.id}, varId: "lineRow"},
-        {type: "td", classes: "line-number-cell", text: line.time_mode == 1 ? line.time : `+${line.time}`, target: "@lineRow"},
+        {type: "td", classes: "line-number-cell", text: formatScenarioLineTime(line), target: "@lineRow"},
         {type: "td", classes: "line-content-cell", text: line.name, target: "@lineRow"},
         {type: "td", classes: "line-note-cell", text: line.comment, target: "@lineRow"},
         {type: "td", classes: "line-comments-cell", varId: "commentsCell", target: "@lineRow"},
@@ -173,7 +190,12 @@ async function addRole() {
         confirmText: "Create",
         elements: [
             {type: "input-label", id: "newRoleName", label: "Role name"}
-        ]
+        ],
+        onValidate: data => {
+            let errors = {}
+            if(!errors.newRoleName) errors.newRoleName = "Please fill in a role name";
+            return errors;
+        }
     });
 
     if (!newRoleData || !newRoleData.newRoleName) return;
@@ -185,37 +207,101 @@ async function addRole() {
 async function addLine() {
     const lineCount = currentShowData ? currentShowData.lines.length + 1 : 1;
 
+    let hours = [];
+    for (let i = 0; i < 24; i++) {
+        hours.push({ type: "option", attributes: { value: i }, text: i.toString().padStart(2, "0") });
+    }
+
+    let minutes = [];
+    for (let i = 0; i < 60; i++) {
+        minutes.push({ type: "option", attributes: { value: i }, text: i.toString().padStart(2, "0") });
+    }
+    let seconds = [];
+    for (let i = 0; i < 60; i++) {
+        seconds.push({ type: "option", attributes: { value: i }, text: i.toString().padStart(2, "0") });
+    }
+
+    function toggleAbsoluteTimeSelection(value) {
+        const absoluteTimeSelection = document.getElementById("absoluteTimeSelection");
+        if (!absoluteTimeSelection) return;
+        absoluteTimeSelection.style.display = value === "absolute" ? "flex" : "none";
+    }
+
     const lineData = await dynamicPrompt({
         title: "Add Scenario Line",
         confirmText: "Add Line",
         elements: [
             // 1. Two-Column Row for Time Controls
-            {type: "div", classes: "form-row-2col", varId: "timeRow" },
-            
-            {type: "div", classes: "form-group", varId: "timeModeGroup", target: "@timeRow" },
-            {type: "select-label", label: "Time Mode", id: "timeReference", options: [
-                { type: "option", attributes: { value: "relative" }, text: "Relative (+00:00)" },
-                { type: "option", attributes: { value: "absolute" }, text: "Absolute (Clock)" }
-            ], target: "@timeModeGroup"},
+            {type: "select-label", label: "Time Mode", id: "startMode", events: { change: (e) => toggleAbsoluteTimeSelection(e.target.value) }, options: [
+                { type: "option", attributes: { value: "follow" }, text: "After previous" },
+                { type: "option", attributes: { value: "absolute" }, text: "Start time" }
+            ]},
 
-            {type: "div", classes: "form-group", varId: "timeValueGroup", target: "@timeRow" },
-            {type: "input-label", id: "timeValue", label: "Time / Offset", target: "@timeValueGroup"},
+            {type: "div", classes: "form-group", id: "absoluteTimeSelection", style: {display: "none"} },
+            {type: "label", text: "Start Time", target: "#absoluteTimeSelection"},
+            {type: "div", classes: "form-row-3col", varId: "absoluteTimeRow", target: "#absoluteTimeSelection"},
+            {type: "select-label", label: "Hour", id: "timeUnit", options: hours, target: "@absoluteTimeRow"},
+            {type: "select-label", label: "Minutes", id: "timeMinute", options: minutes, target: "@absoluteTimeRow"},
+            {type: "select-label", label: "Seconds", id: "timeSecond", options: seconds, target: "@absoluteTimeRow"},
+            
+            {type: "div", classes: "form-group", varId: "durationGroup" },
+            {type: "label", text: "Duration", target: "@durationGroup"},
+            {type: "div", classes: "form-row-3col", id: "durationRow", target: "@durationGroup" },
+            {type: "select-label", label: "Hour", id: "durationHour", options: hours, target: "#durationRow"},
+            {type: "select-label", label: "Minutes", id: "durationMinute", options: minutes, target: "#durationRow"},
+            {type: "select-label", label: "Seconds", id: "durationSecond", options: seconds, target: "#durationRow"},
 
             // 2. Full-Width Main Fields (No target needed -> appends directly to modal body)
             {type: "input-label", id: "lineName", label: "Cue Name", placeholder: "e.g., Intro Cue"},
             {type: "textarea-label", id: "lineContent", label: "Cue Description", placeholder: "Enter cue description...", rows: 3}
-        ]
+        ],
+        onValidate: data => {
+            let errors = {};
+            if (data.lineName.length < 5 || data.lineName.length > 100)
+                errors.lineName = "Cue Name must be between 5 and 100 characters.";
+
+            const durationParts = [data.durationHour, data.durationMinute, data.durationSecond];
+            if (durationParts.every(value => Number(value) === 0))
+                errors.durationRow = "Select the duration of this item";
+
+            const startTimeParts = [data.timeUnit, data.timeMinute, data.timeSecond];
+            if (data.startMode === "absolute" && startTimeParts.every(value => Number(value) === 0))
+                errors.absoluteTimeSelection = "Select the absolute start time";
+
+            return errors;
+        }
     });
 
     if (!lineData || !lineData.lineContent) return;
+
+    const absoluteTimeStart = lineData.startMode === "absolute";
+    const duration = (
+        (Number(lineData.durationHour) * 3600) +
+        (Number(lineData.durationMinute) * 60) +
+        Number(lineData.durationSecond)
+    );
+
+    let absoluteStartTimestamp = null;
+    if (absoluteTimeStart) {
+        const absoluteStartDate = new Date(currentShowData.show.time * 1000);
+        absoluteStartDate.setHours(
+            Number(lineData.timeUnit),
+            Number(lineData.timeMinute),
+            Number(lineData.timeSecond),
+            0
+        );
+        absoluteStartTimestamp = Math.floor(absoluteStartDate.getTime() / 1000);
+    }
+
+    if (!lineData.lineContent || lineData.lineContent.trim() === "") lineData.lineContent = " ";
 
     await invoke("add_scenario_line", { 
         showId: currentShowId, 
         lineOrder: lineCount,
         lineName: lineData.lineName,
         lineComment: lineData.lineContent,
-        lineTime: lineData.timeValue,
-        lineTimeMode: lineData.timeReference === "relative" ? 0 : 1
+        duration,
+        absoluteTime: absoluteStartTimestamp
     });
     await refreshShowData();
 }
@@ -240,7 +326,10 @@ async function addComment(lineId, commentId = null) {
         elements: [
             {type: "select-label", id: "roleId", label: "Assign to Role", options: roleOptions},
             {type: "textarea-label", id: "commentText", label: "Comment", rows: "2", value: commentValue}
-        ]
+        ],
+        onValidate: data => {
+            if(commentText.length < 1) return {commentText: "Comment can't be empty"}
+        }
     });
 
     if (!commentData || !commentData.commentText) return;
@@ -319,9 +408,9 @@ async function openPrintDialog() {
         ]
     });
 
-    if (options) {
-        generateAndPrintSheet(currentShowData, options);
-    }
+    if(!options) return;
+    
+    generateAndPrintSheet(currentShowData, options);
 }
 
 function generateAndPrintSheet(data, options) {
@@ -357,7 +446,7 @@ function generateAndPrintSheet(data, options) {
 
             return `
                 <tr>
-                    <td class="col-time"><strong>${line.time || ''}</strong></td>
+                    <td class="col-time"><strong>${formatScenarioLineTime(line)}</strong></td>
                     <td class="col-cue"><strong>${line.name || ''}</strong></td>
                     <td class="col-note">${(line.comment || '').trim().replaceAll('\n', '<br>')}</td>
                     <td class="col-comments">${commentsHtml}</td>
