@@ -602,8 +602,11 @@ td.create-show-cell {
 
 .line-number-cell {
   font-weight: 700;
-  color: var(--accent-color);
   vertical-align: top;
+}
+
+.line-number-cell .startTime {
+  color: var(--accent-color);
 }
 
 .line-content-cell {

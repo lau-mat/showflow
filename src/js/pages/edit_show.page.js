@@ -139,7 +139,10 @@ function buildLineRow(line, allComments, allRoles, startTimestamp) {
 
     let content = [
         {type: "tr", target: "@tableBody", data: {id: line.id}, varId: "lineRow"},
-        {type: "td", classes: "line-number-cell", text: formatScenarioLineTime(startTimestamp), target: "@lineRow"},
+        {type: "td", classes: "line-number-cell", children: [
+            {type: "div", classes: "startTime", text: formatScenarioLineTime(startTimestamp)},
+            {type: "div", classes: "duration", text: formatScenarioLineDuration(line.duration)}
+        ], target: "@lineRow"},
         {type: "td", classes: "line-content-cell", text: line.name, target: "@lineRow"},
         {type: "td", classes: "line-note-cell", text: line.comment, target: "@lineRow"},
         {type: "td", classes: "line-comments-cell", varId: "commentsCell", target: "@lineRow"},
