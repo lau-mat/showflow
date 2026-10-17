@@ -149,31 +149,12 @@ function fmtCountdown(secs) {
         : `${m}:${String(s).padStart(2,"0")}`;
 }
 
-function formatCueTime(line) {
-    if (line.absolute_time != null) {
-        return new Date(Number(line.absolute_time) * 1000).toLocaleTimeString("en-GB", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false
-        });
-    }
-    return fmtCountdown(Number(line.duration));
+function formatCueTime(lines, cueIndex) {
+    return formatScenarioLineTime(resolveCueStartTimestamp(lines, cueIndex));
 }
 
 function resolveCueStartTimestamp(lines, cueIndex) {
-    let nextStart = Number(session.showContent.show?.time);
-    if (!Number.isFinite(nextStart)) return null;
-
-    for (let index = 0; index <= cueIndex; index++) {
-        const line = lines[index];
-        const start = line.absolute_time == null ? nextStart : Number(line.absolute_time);
-        if (!Number.isFinite(start)) return null;
-        if (index === cueIndex) return start;
-        nextStart = start + Number(line.duration || 0);
-    }
-
-    return null;
+    return resolveScenarioLineStartTimestamp(session.showContent.show?.time, lines, cueIndex);
 }
 
 function noteNodes(lineId, small = false) {
@@ -216,7 +197,7 @@ function renderCueList(lines) {
             children: [
                 { type: "span", classes: "ch-cue-num",  text: String(i + 1).padStart(2, "0") },
                 { type: "span", classes: "ch-cue-name", text: line.name },
-                { type: "span", classes: "ch-cue-time", text: formatCueTime(line) }
+                { type: "span", classes: "ch-cue-time", text: formatCueTime(lines, i) }
             ]
         }, el);
     });
@@ -245,7 +226,7 @@ function renderCurrentCue(lines) {
             { type: "div", classes: "ch-cur-header", children: [
                 { type: "span", classes: "ch-cur-badge", text: `CUE ${idx + 1}` },
                 { type: "h2",   classes: "ch-cur-title", text: line.name },
-                { type: "span", classes: "ch-cur-time",  text: formatCueTime(line) }
+                { type: "span", classes: "ch-cur-time",  text: formatCueTime(lines, idx) }
             ]},
             ...(line.comment ? [{ type: "p", classes: "ch-cur-desc", text: line.comment }] : []),
             ...noteNodes(line.id)
@@ -304,7 +285,7 @@ function renderNextCue(lines) {
                 { type: "span", classes: "ch-next-badge", text: "NEXT" },
                 { type: "span", classes: "ch-next-name",  text: line.name },
                 { type: "div",  classes: "ch-next-times", children: [
-                    { type: "span", classes: "ch-next-time-label", text: formatCueTime(line) },
+                    { type: "span", classes: "ch-next-time-label", text: formatCueTime(lines, nextIdx) },
                     ...(hasCountdown ? [{ type: "span", classes: "ch-countdown", id: "chCountdown", text: "" }] : [])
                 ]}
             ]},

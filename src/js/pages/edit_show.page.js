@@ -66,7 +66,7 @@ function buildEditShowLayout(data) {
         { type: "table", classes: "lines-table", varId: "table", target: "@tableWrapper" },
         { type: "thead", varId: "tableHeader", target: "@table" },
         { type: "tr", varId: "tableHeaderRow", target: "@tableHeader" },
-        { type: "th", text: "Time", style: {width: "90px"}, target: "@tableHeaderRow" },
+        { type: "th", text: "Time", style: {width: "110px"}, target: "@tableHeaderRow" },
         { type: "th", text: "Cue", style: {width: "160px"}, target: "@tableHeaderRow" },
         { type: "th", text: "Note", target: "@tableHeaderRow" },
         { type: "th", text: "Comments", style: {width: "250px"}, target: "@tableHeaderRow" },
@@ -102,7 +102,10 @@ function buildEditShowLayout(data) {
 
     // Dynamic Scenario Lines Population (Spreading flat array)
     const lineItems = data.lines.length > 0 ?
-        data.lines.flatMap(line => buildLineRow(line, data.comments, data.roles)) // flatMap in case buildLineRow returns array of elements
+        data.lines.flatMap((line, index) => buildLineRow(
+            line, data.comments, data.roles,
+            resolveScenarioLineStartTimestamp(data.show.time, data.lines, index)
+        )) // flatMap in case buildLineRow returns array of elements
         :
         [{
             type: "tr",
@@ -131,29 +134,12 @@ function sortCommentsByRole(comments) {
     });
 }
 
-function formatScenarioLineTime(line) {
-    if (line.absolute_time != null) {
-        return new Date(Number(line.absolute_time) * 1000).toLocaleTimeString("en-GB", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false
-        });
-    }
-
-    const duration = Number(line.duration);
-    const hours = Math.floor(duration / 3600);
-    const minutes = Math.floor((duration % 3600) / 60);
-    const seconds = duration % 60;
-    return `+${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-    
-function buildLineRow(line, allComments, allRoles) {
+function buildLineRow(line, allComments, allRoles, startTimestamp) {
     const lineComments = allComments.filter(c => c.line_id === line.id);
 
     let content = [
         {type: "tr", target: "@tableBody", data: {id: line.id}, varId: "lineRow"},
-        {type: "td", classes: "line-number-cell", text: formatScenarioLineTime(line), target: "@lineRow"},
+        {type: "td", classes: "line-number-cell", text: formatScenarioLineTime(startTimestamp), target: "@lineRow"},
         {type: "td", classes: "line-content-cell", text: line.name, target: "@lineRow"},
         {type: "td", classes: "line-note-cell", text: line.comment, target: "@lineRow"},
         {type: "td", classes: "line-comments-cell", varId: "commentsCell", target: "@lineRow"},
@@ -193,7 +179,7 @@ async function addRole() {
         ],
         onValidate: data => {
             let errors = {}
-            if(!errors.newRoleName) errors.newRoleName = "Please fill in a role name";
+            if(!data.newRoleName) errors.newRoleName = "Please fill in a role name";
             return errors;
         }
     });
@@ -353,8 +339,7 @@ async function addComment(lineId, commentId = null) {
 async function deleteLine(id){
     await invoke("delete_scenario_line", {lineId: id});
 
-    const line = document.querySelector(`.lines-table tr[data-id='${id}']`);
-    line.remove();
+    await refreshShowData();
 }
 
 function toggleRoleVisibility(roleId, svgElement) {
@@ -433,7 +418,7 @@ function generateAndPrintSheet(data, options) {
 
     // Helper to build a single printable A4 page sheet
     const buildSheetSection = (titleSub, commentsList) => {
-        const tableRowsHtml = data.lines.map(line => {
+        const tableRowsHtml = data.lines.map((line, index) => {
             const lineComments = commentsList.filter(c => c.line_id === line.id);
             
             const commentsHtml = lineComments.length > 0 
@@ -446,7 +431,7 @@ function generateAndPrintSheet(data, options) {
 
             return `
                 <tr>
-                    <td class="col-time"><strong>${formatScenarioLineTime(line)}</strong></td>
+                    <td class="col-time"><strong>${formatScenarioLineTime(resolveScenarioLineStartTimestamp(data.show.time, data.lines, index))}</strong></td>
                     <td class="col-cue"><strong>${line.name || ''}</strong></td>
                     <td class="col-note">${(line.comment || '').trim().replaceAll('\n', '<br>')}</td>
                     <td class="col-comments">${commentsHtml}</td>
