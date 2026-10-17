@@ -156,9 +156,10 @@
 
   /* Precise Column Width Allocation (Sum = 180mm) */
   .col-time     { width: 20mm !important; }  /* Time offset */
+  .col-duration { width: 20mm !important; }
   .col-cue      { width: 35mm !important; }  /* Cue Name */
-  .col-note     { width: 70mm !important; }  /* Cue Description / Script Line */
-  .col-comments { width: 55mm !important; }  /* Role Comments */
+  .col-note     { width: 60mm !important; }  /* Cue Description / Script Line */
+  .col-comments { width: 45mm !important; }  /* Role Comments */
 
   /* 5. Role Comment Cards & Badges (FIXED BADGE FLOW & SCALING) */
   .print-comment-card {

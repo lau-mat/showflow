@@ -435,6 +435,7 @@ function generateAndPrintSheet(data, options) {
             return `
                 <tr>
                     <td class="col-time"><strong>${formatScenarioLineTime(resolveScenarioLineStartTimestamp(data.show.time, data.lines, index))}</strong></td>
+                    <td class="col-duration">${formatScenarioLineDuration(line.duration)}</td>
                     <td class="col-cue"><strong>${line.name || ''}</strong></td>
                     <td class="col-note">${(line.comment || '').trim().replaceAll('\n', '<br>')}</td>
                     <td class="col-comments">${commentsHtml}</td>
@@ -458,6 +459,7 @@ function generateAndPrintSheet(data, options) {
                     <thead>
                         <tr>
                             <th class="col-time">Time</th>
+                            <th class="col-duration">Duration</th>
                             <th class="col-cue">Cue</th>
                             <th class="col-note">Note / Description</th>
                             <th class="col-comments">Role Comments</th>
