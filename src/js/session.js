@@ -50,7 +50,9 @@ ws.on("error", data => {
 });
 
 ws.on("cue_change", ({ current_cue, next_cue }) => {
+    sessionData = sessionData || {};
     sessionData.current_cue = current_cue;
+    renderCueNotes();
 
     // Reset all cards
     document.querySelectorAll(".cue-card").forEach(el => {
@@ -84,6 +86,7 @@ ws.on("get_show_data", data => {
     showData = data.data;
 
     elemShowName.innerText = showData.show.name;
+    renderCueNotes();
     loadQRCode();
     elemItemCounter.innerText = `${showData.lines.length} Items`;
 
@@ -109,6 +112,7 @@ ws.on("get_show_data", data => {
 
 ws.on("get_session_data", data => {
     sessionData = data.session;
+    renderCueNotes();
     
     sessionData.joined_users.forEach(user => addUserToElem(user.client_role, user.client_name));
 });
@@ -126,6 +130,62 @@ function addUserToElem(role_id, user_name){
         elem.innerText = `Users: ${user_name}`;
     } else {
         elem.innerText += `, ${user_name}`;
+    }
+}
+
+function renderCueNotes() {
+    if (!showData) return;
+
+    const lines = [...showData.lines].sort((a, b) => a.order - b.order);
+    const currentCue = sessionData?.current_cue;
+    const currentIndex = Number.isInteger(currentCue) && currentCue > 0 ? currentCue - 1 : -1;
+
+    renderCueNoteCard("active", lines[currentIndex] || null);
+    renderCueNoteCard("next", lines[currentIndex + 1] || null);
+}
+
+function renderCueNoteCard(kind, line) {
+    const number = document.getElementById(`${kind === "active" ? "current" : "next"}CueNumber`);
+    const title = document.getElementById(`${kind === "active" ? "current" : "next"}CueTitle`);
+    const notes = document.getElementById(`${kind === "active" ? "current" : "next"}CueNotes`);
+    if (!number || !title || !notes) return;
+
+    number.textContent = line ? `Cue ${line.id}` : "—";
+    title.textContent = line ? line.name : kind === "active" ? "Waiting for cue" : "No upcoming cue";
+    notes.replaceChildren();
+
+    if (!line) {
+        notes.textContent = kind === "active" ? "Waiting for the first cue." : "No upcoming cue.";
+        return;
+    }
+
+    const lineComment = line.comment?.trim();
+    if (lineComment) {
+        const comment = document.createElement("div");
+        comment.className = "note-line-comment";
+        comment.textContent = lineComment;
+        notes.appendChild(comment);
+    }
+
+    const comments = (showData.comments || [])
+        .filter(comment => comment.line_id === line.id)
+        .sort((a, b) => (a.role_id ?? -1) - (b.role_id ?? -1));
+
+    comments.forEach(comment => {
+        const roleName = comment.role_id == null
+            ? "General"
+            : showData.roles.find(role => role.id === comment.role_id)?.name || "Role";
+        const commentElement = document.createElement("div");
+        commentElement.className = "note-role-comment";
+
+        const label = document.createElement("strong");
+        label.textContent = `${roleName}: `;
+        commentElement.append(label, document.createTextNode(comment.comment));
+        notes.appendChild(commentElement);
+    });
+
+    if (!lineComment && comments.length === 0) {
+        notes.textContent = "No notes for this cue.";
     }
 }
 

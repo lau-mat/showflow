@@ -22,29 +22,23 @@
         <section class="show-overview-section">
             
             <!-- CURRENT & NEXT CUE NOTES BANNER -->
-            <div class="cue-notes-panel">
+            <div class="cue-notes-panel" aria-live="polite">
                 <div class="note-card active">
                     <div class="note-header active">
                         <span>Current Cue Notes</span>
-                        <span>Cue 2</span>
+                        <span class="note-cue-number" id="currentCueNumber">—</span>
                     </div>
-                    <div class="note-title">Host Entrance & Welcome Speech</div>
-                    <div class="note-body">
-                        Lighting: Warm spotlight on Stage Left. <br>
-                        Sound: Fade background music down to 10% on podium mic un-mute.
-                    </div>
+                    <div class="note-title" id="currentCueTitle">Waiting for cue data...</div>
+                    <div class="note-body" id="currentCueNotes"></div>
                 </div>
 
                 <div class="note-card next">
                     <div class="note-header next">
                         <span>Next Cue Notes</span>
-                        <span>Cue 3</span>
+                        <span class="note-cue-number" id="nextCueNumber">—</span>
                     </div>
-                    <div class="note-title">Musical Act 1 - Main Stage</div>
-                    <div class="note-body">
-                        Lighting: Cue blue wash overhead once host exits. <br>
-                        Stage: Standby band on Stage Right.
-                    </div>
+                    <div class="note-title" id="nextCueTitle">Waiting for cue data...</div>
+                    <div class="note-body" id="nextCueNotes"></div>
                 </div>
             </div>
 
