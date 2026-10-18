@@ -16,6 +16,11 @@ const elemItemCounter = document.getElementById("itemCounter");
 const btnNextCue = document.getElementById("btnNextCue");
 const btnPreviousCue = document.getElementById("previousCue");
 
+document.addEventListener("DOMContentLoaded", () => {
+    dynamicGenerator({type: "svg", file: "icons/share.svg", events: {click: share}, classes: ["btn", "icon-btn"], style: {width: "24px", height: "24px"}}, "#actionBtnContainer");
+    dynamicGenerator({type: "svg", file: "icons/fullScreen.svg", events: {click: toggleFullscreen}, classes: ["btn", "icon-btn"], style: {width: "24px", height: "24px", marginLeft: "5px"}}, "#actionBtnContainer");
+});
+
 ws.routes = {};
 
 ws.on = (ref, func) => {
@@ -77,17 +82,42 @@ ws.on("cue_change", ({ current_cue, next_cue }) => {
     if (nextCard) nextCard.classList.add("next");
 });
 
-btnFullscreen.addEventListener('click', async () => {
+async function toggleFullscreen() {
     const isFullscreen = await appWindow.isFullscreen();
     await appWindow.setFullscreen(!isFullscreen);
-});
+}
+
+async function share() {
+    try {
+        const qrSvg = await invoke('generate_server_qr');
+
+        addHoverBox(
+            null,
+            "Share session",
+            [
+                {type: "div", id: "qr-container", classes: "qr-box"},
+                {
+                    type: "svg",
+                    sketch: qrSvg,
+                    pathStyle: {
+                        path: {fill: "rgb(140, 140, 140)"},
+                        rect: {fill: "var(--qr-background)"}
+                    },
+                    target: "#qr-container"
+                }
+            ],
+            {width: "min(90vw, 320px)", height: "auto"}
+        )
+    } catch (err) {
+        console.error("Failed to generate QR code:", err);
+    }
+}
 
 ws.on("get_show_data", data => {
     showData = data.data;
 
     elemShowName.innerText = showData.show.name;
     renderCueNotes();
-    loadQRCode();
     elemItemCounter.innerText = `${showData.lines.length} Items`;
 
     showData.lines.forEach(line => {
@@ -186,15 +216,6 @@ function renderCueNoteCard(kind, line) {
 
     if (!lineComment && comments.length === 0) {
         notes.textContent = "No notes for this cue.";
-    }
-}
-
-async function loadQRCode() {
-    try {
-        const qrSvg = await invoke('generate_server_qr');
-        document.getElementById('qr-container').innerHTML = qrSvg;
-    } catch (err) {
-        console.error("Failed to generate QR code:", err);
     }
 }
 

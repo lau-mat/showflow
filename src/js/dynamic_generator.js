@@ -86,29 +86,42 @@ const dynamicGenerator = ( definition, location = document.body ) => {
 
     switch( definition.type ) {
         case "svg":
-            if(!definition.file) return console.error("trying to add svg without file reference");
+            let svgContent;
+            const hasSketch = definition.sketch !== undefined;
 
-            if(!svgCache.has(definition.file)) {
-                const request = new XMLHttpRequest();
-                request.open("GET", definition.file, false);
-                request.send(null);
-
-                if(request.status === 200 && request.responseText.toLowerCase().includes("<?xml version")) {
-                    svgCache.set(definition.file, request.responseText);
-                } else {
-                    throw new Error(`Failed to request SVG file, ${definition.file}`);
+            if(hasSketch) {
+                if(typeof definition.sketch !== "string") {
+                    throw new TypeError("SVG sketch must be a string");
                 }
-            }
+                svgContent = definition.sketch;
+            } else {
+                if(!definition.file) return console.error("trying to add svg without file reference");
 
-            const svgContent = svgCache.get(definition.file);
-            item = document.createElementNS(svgNamespace, definition.type);
+                if(!svgCache.has(definition.file)) {
+                    const request = new XMLHttpRequest();
+                    request.open("GET", definition.file, false);
+                    request.send(null);
+
+                    if(request.status === 200 && request.responseText.toLowerCase().includes("<?xml version")) {
+                        svgCache.set(definition.file, request.responseText);
+                    } else {
+                        throw new Error(`Failed to request SVG file, ${definition.file}`);
+                    }
+                }
+
+                svgContent = svgCache.get(definition.file);
+            }
 
             const parser = new DOMParser();
             const svgDoc = parser.parseFromString(svgContent, "image/svg+xml");
             const loadedSvg = svgDoc.documentElement;
+            if(loadedSvg.localName !== "svg") {
+                throw new Error("Invalid SVG markup");
+            }
 
-            if(loadedSvg.getAttribute("viewBox")) {
-                item.setAttribute("viewBox", loadedSvg.getAttribute("viewBox"));
+            item = document.createElementNS(svgNamespace, definition.type);
+            for(const attribute of loadedSvg.attributes) {
+                item.setAttributeNS(attribute.namespaceURI, attribute.name, attribute.value);
             }
 
             let generalStyle = new Map();

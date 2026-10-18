@@ -67,6 +67,9 @@ header {
     gap: 6px;
     transition: background 0.15s ease, border-color 0.15s ease;
 }
+.btn.icon-btn {
+    padding: 2px;
+}
 
 .btn:hover {
     background-color: var(--bg-card-hover);
@@ -343,19 +346,20 @@ main {
     background-color: var(--text-muted);
 }
 
-/* QR Code Container */
+/* Keep the generated QR code on a high-contrast surface for reliable scanning. */
 .qr-box {
+    --qr-background: #19191c;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: var(--bg-card); /* Matches the UI card background */
-    border: 1px solid var(--border-subtle);
-    padding: 12px;
+    background-color: var(--qr-background);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
-    min-height: 160px;
+    padding: 16px;
 }
 
 .qr-box svg {
-    filter: invert(1) hue-rotate(180deg);
-    mix-blend-mode: screen; /* Blends the inverted background */
+    display: block;
+    width: min(100%, 240px);
+    height: auto;
 }
