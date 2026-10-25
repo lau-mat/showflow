@@ -1,6 +1,7 @@
 use crate::{ShowDetails, db, fetch_show_details};
 
 use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Serialize, Deserialize};
 use tauri::State;
 use tokio::net::TcpListener;
@@ -26,7 +27,29 @@ pub struct Session {
     pub show_id: i64,
     pub is_active: bool,
     pub current_cue: Option<i64>,
+    pub show_started_at: Option<f64>,
+    pub cue_started_at: Option<f64>,
     pub joined_users: Vec<Client>,
+}
+
+impl Session {
+    fn change_cue(&mut self, cue: i64, start_show: bool) -> Result<ServerMessage, String> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| format!("Unable to determine cue start time: {}", err))?
+            .as_secs_f64();
+        self.current_cue = Some(cue);
+        self.cue_started_at = Some(now);
+        if start_show && self.show_started_at.is_none() {
+            self.show_started_at = Some(now);
+        }
+        Ok(ServerMessage::CueChange {
+            current_cue: cue,
+            next_cue: Some(cue + 1),
+            show_started_at: self.show_started_at,
+            cue_started_at: self.cue_started_at,
+        })
+    }
 }
 
 pub struct AppState {
@@ -60,7 +83,12 @@ pub enum ServerMessage {
     JoinSession { client_id: String, client_name: String, client_role: i64 },
     GetShowData { data: ShowDetails },
     GetSessionData { session: Session },
-    CueChange { current_cue: i64, next_cue: Option<i64> },
+    CueChange {
+        current_cue: i64,
+        next_cue: Option<i64>,
+        show_started_at: Option<f64>,
+        cue_started_at: Option<f64>,
+    },
     Error { message: String }
 }
 
@@ -174,8 +202,10 @@ async fn handle_client_message(
             println!("Client {} requested next cue", client.client_id);
             let mut session_guard = session.lock().unwrap();
             if let Some(s) = &mut *session_guard {
-                s.current_cue = Some(s.current_cue.map_or(1, |c| c + 1));
-                MessageResponse::Broadcast(ServerMessage::CueChange { current_cue: s.current_cue.unwrap_or(0), next_cue: s.current_cue.map(|c| c + 1) })
+                match s.change_cue(s.current_cue.map_or(1, |c| c + 1), true) {
+                    Ok(message) => MessageResponse::Broadcast(message),
+                    Err(err) => MessageResponse::Error(err),
+                }
             } else {
                 MessageResponse::Error("No active session found".to_string())
             }
@@ -185,8 +215,10 @@ async fn handle_client_message(
             println!("Client {} requested previous cue", client.client_id);
             let mut session_guard = session.lock().unwrap();
             if let Some(s) = &mut *session_guard {
-                s.current_cue = Some(s.current_cue.map_or(1, |c| if c > 1 { c - 1 } else { 1 }));
-                MessageResponse::Broadcast(ServerMessage::CueChange { current_cue: s.current_cue.unwrap_or(0), next_cue: s.current_cue.map(|c| c + 1) })
+                match s.change_cue(s.current_cue.map_or(1, |c| if c > 1 { c - 1 } else { 1 }), false) {
+                    Ok(message) => MessageResponse::Broadcast(message),
+                    Err(err) => MessageResponse::Error(err),
+                }
             } else {
                 MessageResponse::Error("No active session found".to_string())
             }
@@ -196,8 +228,10 @@ async fn handle_client_message(
             println!("Client {} requested jump to cue {}", client.client_id, cue_number);
             let mut session_guard = session.lock().unwrap();
             if let Some(s) = &mut *session_guard {
-                s.current_cue = Some(cue_number);
-                MessageResponse::Broadcast(ServerMessage::CueChange { current_cue: cue_number, next_cue: Some(cue_number + 1) })
+                match s.change_cue(cue_number, false) {
+                    Ok(message) => MessageResponse::Broadcast(message),
+                    Err(err) => MessageResponse::Error(err),
+                }
             } else {
                 MessageResponse::Error("No active session found".to_string())
             }
@@ -277,6 +311,8 @@ pub async fn start_session(show_id: i64, state: State<'_, AppState>, db_state: S
         show_id,
         is_active: true,
         current_cue: None,
+        show_started_at: None,
+        cue_started_at: None,
         joined_users: Vec::new(),
     });
     
@@ -416,4 +452,47 @@ pub fn generate_server_qr() -> Result<String, String> {
         .build();
 
     Ok(svg_string)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cue_timestamps_start_once_and_are_included_in_snapshots_and_broadcasts() {
+        let mut session = Session {
+            session_id: "test".into(),
+            show_id: 1,
+            is_active: true,
+            current_cue: None,
+            show_started_at: None,
+            cue_started_at: None,
+            joined_users: Vec::new(),
+        };
+
+        session.change_cue(3, false).unwrap();
+        assert_eq!(session.show_started_at, None);
+        assert!(session.cue_started_at.is_some());
+
+        let message = session.change_cue(4, true).unwrap();
+        let show_start = session.show_started_at.unwrap();
+        assert_eq!(session.cue_started_at, Some(show_start));
+        let broadcast = serde_json::to_value(message).unwrap();
+        assert_eq!(broadcast["show_started_at"], show_start);
+        assert_eq!(broadcast["cue_started_at"], show_start);
+        assert_eq!(broadcast["current_cue"], 4);
+        assert_eq!(broadcast["next_cue"], 5);
+
+        for (cue, next) in [(5, true), (4, false), (1, false)] {
+            session.cue_started_at = Some(0.0);
+            session.change_cue(cue, next).unwrap();
+            assert_eq!(session.current_cue, Some(cue));
+            assert_eq!(session.show_started_at, Some(show_start));
+            assert!(session.cue_started_at.unwrap() >= show_start);
+        }
+
+        let snapshot = serde_json::to_value(&session).unwrap();
+        assert_eq!(snapshot["show_started_at"], show_start);
+        assert_eq!(snapshot["cue_started_at"], session.cue_started_at.unwrap());
+    }
 }

@@ -62,6 +62,13 @@
                 </div>
             </div>
 
+            <!-- Controls Panel -->
+             <div class="panel">
+                <div class="timer" data-timer-name="system-clock" data-label="Current Time" data-source="system-clock" data-format="HH-MM-SS"></div>
+                <div class="timer" data-timer-name="show-start" data-label="Show duration" data-source="show-duration" data-format="MM-SS"></div>
+                <div class="timer" data-timer-name="item-timer" data-label="Current Item" data-source="current-item" data-format="MM-SS"></div>
+             </div>
+
             <!-- Connected Roles Panel -->
             <div class="panel">
                 <h3>Session overview</h3>
@@ -72,6 +79,7 @@
     </main>
 
     <script src="js/dynamic_generator.js"></script>
+    <script src="js/timers.js"></script>
     <script src="js/session.js"></script>
     </body>
 </html>

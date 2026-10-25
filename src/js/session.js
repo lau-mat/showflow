@@ -54,9 +54,11 @@ ws.on("error", data => {
     throw new Error(`Backend error: ${data.message}`);
 });
 
-ws.on("cue_change", ({ current_cue, next_cue }) => {
+ws.on("cue_change", ({ current_cue, next_cue, show_started_at, cue_started_at }) => {
     sessionData = sessionData || {};
     sessionData.current_cue = current_cue;
+    sessionData.show_started_at = show_started_at;
+    sessionData.cue_started_at = cue_started_at;
     renderCueNotes();
 
     // Reset all cards
@@ -230,3 +232,9 @@ btnPreviousCue.addEventListener("click", () => {
 function jumpToCue(cueId){
     ws.emit("jump_to_cue", {cue_number: cueId});
 }
+
+//************************
+// Timers
+// ***********************/
+
+startTimers(document, () => ({ showData, sessionData }));
