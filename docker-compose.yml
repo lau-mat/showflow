@@ -62,7 +62,7 @@ services:
   webapp:
     build:
       context: .
-      dockerfile: webapp/Dockerfile
+      dockerfile: frontend/Dockerfile
     container_name: showflow_webapp
     ports:
       - "3000:80"

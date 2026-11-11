@@ -14,7 +14,8 @@ docker compose build
 
 Tauri starts a dedicated Vite server on `127.0.0.1:1420` serving
 `frontend/main`. Desktop release builds package that static directory directly.
-The web app uses the existing Vite configuration to build `webapp` into `dist`.
+The web image uses `frontend/Dockerfile` and the Vite configuration to build
+the same `frontend/main` entry point into the repository-root `dist` directory.
 Frontend asset references and session navigation still need updating for the
 restructured layout.
 

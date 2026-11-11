@@ -6,10 +6,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy everything including the webapp folder and vite config
+# Copy the frontend source and Vite configuration
 COPY . ./
 
-# Run the build (Vite will use root: './webapp' automatically)
+# Build frontend/main into the repository-root dist directory
 RUN npm run build
 
 # Stage 2: Serve via Nginx
