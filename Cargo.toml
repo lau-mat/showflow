@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = [
+    "backend",
+    "session",
+    "protocol",
+    "app/src-tauri" # Keep Cargo pointing to Cargo.toml inside tauri's inner rust folder
+]
+
+[profile.release]
+# Optimize for size in release builds to save disk and binary weight
+strip = true
+opt-level = "z"

@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.laurens.showfow",
   "build": {
-    "frontendDist": "../src"
+    "frontendDist": "../frontend/dist"
   },
   "app": {
     "withGlobalTauri": true,
