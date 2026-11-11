@@ -222,8 +222,8 @@ async function addLine() {
         elements: [
             // 1. Two-Column Row for Time Controls
             {type: "select-label", label: "Time Mode", id: "startMode", events: { change: (e) => toggleAbsoluteTimeSelection(e.target.value) }, options: [
-                { type: "option", attributes: { value: "follow" }, text: "After previous" },
-                { type: "option", attributes: { value: "absolute" }, text: "Start time" }
+                { type: "option", attributes: { value: "follow" }, text: "After scenario line" },
+                { type: "option", attributes: { value: "absolute" }, text: "Fixed time" }
             ]},
 
             {type: "div", classes: "form-group", id: "absoluteTimeSelection", style: {display: "none"} },
@@ -377,8 +377,8 @@ async function openPrintDialog() {
                     }
                 },
                 options: [
-                    { type: "option", attributes: { value: "all_roles_separate" }, text: "Master Run Sheet (All Roles & Comments)" },
-                    { type: "option", attributes: { value: "director" }, text: "Director's Cut (Cues & Notes Only)" },
+                    { type: "option", attributes: { value: "all_roles_separate" }, text: "Master Run Sheet" },
+                    { type: "option", attributes: { value: "director" }, text: "Director's Overview" },
                     { type: "option", attributes: { value: "single_role" }, text: "Role Specific Sheet..." }
                 ]
             },
