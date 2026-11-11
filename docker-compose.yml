@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: showflow_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: showflow_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: showflow_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  backend-1:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: showflow_backend_1
+    environment:
+      - DATABASE_URL=postgres://postgres:secretpassword@postgres:5432/showflow_db
+      - REDIS_URL=redis://redis:6379
+      - RUST_LOG=debug
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  backend-2:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: showflow_backend_2
+    environment:
+      - DATABASE_URL=postgres://postgres:secretpassword@postgres:5432/showflow_db
+      - REDIS_URL=redis://redis:6379
+      - RUST_LOG=debug
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+
+  loadbalancer:
+    image: nginx:alpine
+    container_name: showflow_nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend-1
+      - backend-2
+    restart: unless-stopped
+
+  webapp:
+    build:
+      context: .
+      dockerfile: webapp/Dockerfile
+    container_name: showflow_webapp
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

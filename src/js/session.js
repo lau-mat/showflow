@@ -1,4 +1,4 @@
-const { getCurrentWindow } = window.__TAURI__.window;
+const { getCurrentWindow } = window.__URI__.window;
 const { invoke } = window.__TAURI__.core;
 
 // Auto-detect host IP address
