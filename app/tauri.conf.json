@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.laurens.showfow",
   "build": {
-    "frontendDist": "../frontend/dist"
+    "beforeDevCommand": "npm run dev:app",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../frontend/main"
   },
   "app": {
     "withGlobalTauri": true,

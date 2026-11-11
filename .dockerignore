@@ -1,0 +1,14 @@
+.git
+.vscode
+node_modules
+**/node_modules
+target
+**/target
+dist
+**/dist
+**/gen
+**/*.db
+**/*.db-*
+.env
+.env.*
+*.log

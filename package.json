@@ -6,6 +6,7 @@
   "scripts": {
     "tauri": "tauri",
     "dev": "vite",
+    "dev:app": "vite frontend/main --host 127.0.0.1 --port 1420 --strictPort",
     "build": "vite build"
   },
   "devDependencies": {

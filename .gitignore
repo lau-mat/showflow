@@ -22,4 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-src-tauri/shows.db 
+target/
+app/shows.db
+app/shows.db-*

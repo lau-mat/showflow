@@ -1,8 +1,8 @@
-# Stage 1: Build binary using the latest stable Rust
-FROM rust:latest AS builder
+# Stage 1: Build only the API, using the same distribution as the runtime.
+FROM rust:1-bookworm AS builder
 WORKDIR /app
 COPY . .
-RUN cargo build --release
+RUN cargo build --release --locked -p showflow-backend
 
 # Stage 2: Minimal runtime image
 FROM debian:bookworm-slim

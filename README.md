@@ -2,6 +2,27 @@
 
 This template should help get you started developing with Tauri in vanilla HTML, CSS and Javascript.
 
+## Development and container builds
+
+Run commands from the repository root:
+
+```sh
+npm ci
+npm run tauri dev
+docker compose build
+```
+
+Tauri starts a dedicated Vite server on `127.0.0.1:1420` serving
+`frontend/main`. Desktop release builds package that static directory directly.
+The web app uses the existing Vite configuration to build `webapp` into `dist`.
+Frontend asset references and session navigation still need updating for the
+restructured layout.
+
+The Cargo workspace contains `app`, `backend`, and `protocol`, with a shared
+root `Cargo.lock`. Both backend containers build only `showflow-backend` from
+the repository-root Docker context; desktop GUI dependencies are not compiled
+in the API image. Docker builds require access to a running Docker daemon.
+
 ## Run sheet times
 
 The editor, printed run sheets, and client cue displays show each item's absolute

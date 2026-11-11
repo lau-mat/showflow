@@ -2,9 +2,8 @@
 resolver = "2"
 members = [
     "backend",
-    "session",
     "protocol",
-    "app/src-tauri" # Keep Cargo pointing to Cargo.toml inside tauri's inner rust folder
+    "app",
 ]
 
 [profile.release]

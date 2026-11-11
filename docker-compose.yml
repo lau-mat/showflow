@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -23,8 +21,8 @@ services:
 
   backend-1:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: showflow_backend_1
     environment:
       - DATABASE_URL=postgres://postgres:secretpassword@postgres:5432/showflow_db
@@ -37,8 +35,8 @@ services:
 
   backend-2:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: showflow_backend_2
     environment:
       - DATABASE_URL=postgres://postgres:secretpassword@postgres:5432/showflow_db

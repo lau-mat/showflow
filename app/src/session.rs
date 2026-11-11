@@ -270,7 +270,7 @@ where
 }
 
 #[derive(RustEmbed, Clone)]
-#[folder = "../src/"]
+#[folder = "../frontend/session/"]
 struct Asset;
 
 async fn static_handler(uri: Uri) -> impl IntoResponse {
