@@ -4,6 +4,7 @@ type StyleValue = string | number;
 type Styles = Record<string, StyleValue>;
 type FormData = Record<string, string | number>;
 type FormErrors = Record<string, string>;
+type ValidationResult = FormErrors | null | undefined;
 type EventDefinitions = Record<string, EventListener>
     | { type: string; callback: EventListener }[];
 
@@ -56,7 +57,7 @@ export interface PromptOptions {
     cancelText?: string;
     onConfirm?: (data: FormData) => void;
     onCancel?: () => void;
-    onValidate?: ((data: FormData) => FormErrors | null | undefined) | null;
+    onValidate?: ((data: FormData) => ValidationResult | Promise<ValidationResult>) | null;
     required?: boolean;
 }
 
@@ -439,7 +440,9 @@ class BaseDialog {
 }
 
 /**
- * Custom Promise-based dynamic form prompt modal
+ * Custom Promise-based dynamic form prompt modal.
+ * Validators may return field errors synchronously or asynchronously.
+ * Thrown validation errors reject the prompt; cancellation ignores pending results.
  */
 const dynamicPrompt = ({
     title, 
@@ -453,6 +456,8 @@ const dynamicPrompt = ({
 }: PromptOptions): Promise<FormData | null> => {
     return new Promise((resolve, reject) => {
         let promptDialog: BaseDialog;
+        let validating = false;
+        let settled = false;
 
         const clearErrors = (modalEl: GeneratedElement) => {
             modalEl.querySelectorAll('.modal-error-message').forEach(el => el.remove());
@@ -461,12 +466,15 @@ const dynamicPrompt = ({
         };
 
         const handleCancel = () => {
+            if (settled) return;
+            settled = true;
             promptDialog.close();
             if (onCancel) onCancel();
             resolve(null);
         };
 
-        const handleConfirm = () => {
+        const handleConfirm = async () => {
+            if (validating || settled) return;
             const modalEl = promptDialog.container;
             clearErrors(modalEl);
 
@@ -478,7 +486,36 @@ const dynamicPrompt = ({
             });
 
             if (onValidate) {
-                const errors = onValidate(data);
+                const controls = Array.from(modalEl.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement>('input, select, textarea, button'));
+                const disabledStates = controls.map(control => control.disabled);
+                const confirmButton = promptDialog.content.confirmButton;
+                const validationStatus = promptDialog.content.validationStatus;
+                validating = true;
+                modalEl.setAttribute('aria-busy', 'true');
+                controls.forEach(control => {
+                    if (control !== promptDialog.content.cancelButton) control.disabled = true;
+                });
+                confirmButton.textContent = 'Validating...';
+                validationStatus.removeAttribute('hidden');
+
+                let errors: ValidationResult;
+                try {
+                    errors = await onValidate(data);
+                } catch (error) {
+                    if (!settled) {
+                        settled = true;
+                        promptDialog.close();
+                        reject(error);
+                    }
+                    return;
+                } finally {
+                    validating = false;
+                    modalEl.removeAttribute('aria-busy');
+                    controls.forEach((control, index) => control.disabled = disabledStates[index]);
+                    confirmButton.textContent = confirmText;
+                    validationStatus.setAttribute('hidden', '');
+                }
+                if (settled) return;
                 if (errors && Object.keys(errors).length > 0) {
                     Object.keys(errors).forEach(inputId => {
                         const errorTarget = modalEl.querySelector(`#${CSS.escape(inputId)}`);
@@ -509,6 +546,7 @@ const dynamicPrompt = ({
             }
 
             if (onConfirm) onConfirm(data);
+            settled = true;
             resolve(data);
             promptDialog.close();
         };
@@ -522,9 +560,18 @@ const dynamicPrompt = ({
         const promptDefinition: ElementDefinition[] = [
             { type: "div", classes: "modal-body-wrapper", varId: "modalContent" },
             { type: "div", classes: "modal-footer", varId: "modalFooter" },
+            {
+                type: "span",
+                classes: "modal-validation-status",
+                varId: "validationStatus",
+                text: "Validating...",
+                attributes: { role: "status", hidden: true },
+                target: "@modalFooter"
+            },
             ...(!required ? [{
                 type: "button",
                 classes: ["btn", "btn-secondary"],
+                varId: "cancelButton",
                 text: cancelText,
                 target: "@modalFooter",
                 events: { click: handleCancel }
@@ -532,6 +579,7 @@ const dynamicPrompt = ({
             {
                 type: "button",
                 classes: ["btn", "btn-primary"],
+                varId: "confirmButton",
                 text: confirmText,
                 target: "@modalFooter",
                 events: { click: handleConfirm }
@@ -551,6 +599,15 @@ const dynamicPrompt = ({
         if (required) {
             promptDialog.container.querySelector('.close-btn')?.remove();
         }
+
+        const closeDialog = promptDialog.close.bind(promptDialog);
+        promptDialog.close = () => {
+            if (!settled) {
+                handleCancel();
+                return;
+            }
+            closeDialog();
+        };
 
         promptDialog.open();
     });

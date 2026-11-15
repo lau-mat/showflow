@@ -118,6 +118,40 @@
   padding-top: 0.75rem;
 }
 
+.modal-validation-status:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: auto;
+  color: var(--text-muted, #93939e);
+  font-size: 0.85rem;
+}
+
+.modal-validation-status::before {
+  content: "";
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: validationSpin 0.8s linear infinite;
+}
+
+.modal-box[aria-busy="true"] :disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+@keyframes validationSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-validation-status::before {
+    animation: none;
+  }
+}
+
 /* Input Fields & Validation inside dynamic prompts */
 .modal-content label {
   display: block;

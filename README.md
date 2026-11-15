@@ -18,6 +18,19 @@ The main app stays at `/`: `npm run dev` or `npm run dev:app` serves
 config: `npm run dev:session` serves `frontend/session` on `127.0.0.1:1421`,
 opening `/client.html`; the controller is at `/session.html`.
 
+The browser API client uses same-origin `/api/` URLs. The main Vite development
+server proxies these requests to `http://127.0.0.1:8080`, removing the `/api`
+prefix (for example, `/api/auth/login` becomes `/auth/login`). This avoids
+cross-origin browser requests without enabling backend CORS. Restart Vite after
+changing its proxy configuration. The proxy is development-only; a production
+web server must also forward `/api/` to the backend and remove that prefix.
+Docker Compose exposes the backend gateway on port 8080; port 3000 serves the
+static webapp, not the backend API.
+The gateway uses Docker's DNS resolver to refresh backend container addresses
+automatically after replacement. After editing `nginx/nginx.conf`, validate and
+reload it with `docker compose exec loadbalancer nginx -t` and
+`docker compose exec loadbalancer nginx -s reload`.
+
 Both configs serve `frontend/shared` at `/shared/` and copy it into their builds.
 For example, use `/shared/js/dynamic_generator.js` and
 `/shared/style/boxes.css` from either frontend. These are public, untransformed
@@ -29,6 +42,14 @@ both Vite configs. For example, import `generateDynamic` or `dynamicPrompt` from
 its named exports are not automatically globals in classic scripts.
 Existing runtime-loaded icons are copied into `/icons/` in both builds.
 
+`dynamicPrompt` accepts synchronous or asynchronous `onValidate` callbacks.
+Return an object mapping field IDs to error messages, or `{}`, `null`, or
+`undefined` when validation passes. While validation is pending, the prompt
+shows a "Validating..." status and spinner and disables field editing and repeat
+submission. Optional prompts can still be dismissed; late validation results
+are ignored. A thrown error or rejected validation promise closes the prompt
+and rejects its promise, so callers should handle server/network failures.
+
 `npm run build` builds sessions into `dist/session`, then the main app into
 `dist/main`. The main build also includes the built session pages under
 `/session/` for the Tauri controller window. Run `npm run build:session` before
@@ -38,6 +59,8 @@ use the separate session dev server.
 
 Vite reports that the existing classic scripts cannot be bundled as modules;
 the static-copy plugin deliberately serves/copies these scripts unchanged.
+The main pages copy rule includes only `.js` files; copying the whole directory
+would serve `.ts` pages as raw TypeScript and bypass Vite's transpilation.
 Do not add `type="module"` to those scripts without migrating their globals.
 
 Tauri builds session assets before development and both frontends before release.

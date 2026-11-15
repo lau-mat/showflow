@@ -1,4 +1,5 @@
 const isApp = isTauriProtocol();
+window.localStorage.setItem("isApp", JSON.stringify(isApp));
 
 async function bootstrap(): Promise<void> {
   if (isApp) {
@@ -85,4 +86,4 @@ async function init(){
   shows.forEach(show => addShowItem(show.id, show.name, show.time));
 }
 
-init();
+//init();
