@@ -9,6 +9,7 @@ Run commands from the repository root:
 ```sh
 npm ci
 npm run tauri dev
+export AUTH_JWT_SECRET="$(openssl rand -hex 32)"
 docker compose build
 ```
 
@@ -23,6 +24,94 @@ The Cargo workspace contains `app`, `backend`, and `protocol`, with a shared
 root `Cargo.lock`. Both backend containers build only `showflow-backend` from
 the repository-root Docker context; desktop GUI dependencies are not compiled
 in the API image. Docker builds require access to a running Docker daemon.
+
+## Backend authentication
+
+The backend requires `DATABASE_URL` and `AUTH_JWT_SECRET`. Generate a signing
+secret once with `openssl rand -hex 32`, store it in a secret manager or an
+ignored repository-root `.env` file, and reuse it across restarts and all backend
+replicas. There is no default secret; startup fails if it is missing or shorter
+than 32 bytes. Rotating it invalidates all access tokens, but existing refresh
+tokens can still acquire new access tokens. Docker Compose passes the secret to
+the backend. For a local process:
+
+```sh
+export DATABASE_URL='postgres://USER:PASSWORD@localhost:5432/showflow_db'
+export AUTH_JWT_SECRET='YOUR_PREVIOUSLY_GENERATED_SECRET'
+cargo run -p showflow-backend
+```
+
+Migrations run automatically at startup. The authentication migration adds a
+case-insensitive unique email index and `auth_sessions`. Existing accounts with
+case-variant duplicate emails must be reconciled before that migration can run.
+Passwords in `users.user_pass` must be Argon2 PHC hashes, not plaintext; existing
+plaintext credentials need an out-of-band password reset, not automatic fallback.
+New registrations use independently salted Argon2id hashes. Emails are trimmed
+and lowercased; usernames are trimmed and case-sensitive. Registration requires a
+1-255 character username, an email address, and a 12-1024 byte password. Email
+verification is not implemented or required for login.
+
+Routes (JSON request bodies, relative to the backend or reverse proxy):
+
+| Method | Route | Request / behavior |
+| --- | --- | --- |
+| POST | `/auth/register` | `{"username":"alice","email":"alice@example.com","password":"a long unique password"}`; creates an account and session, returns **201** |
+| POST | `/auth/login` | `{"email":"alice@example.com","password":"a long unique password"}`; returns **200** and creates a separate session |
+| POST | `/auth/refresh` | `{"refresh_token":"..."}`; returns **200** with a replacement token pair |
+| POST | `/auth/logout` | `{"refresh_token":"..."}`; deletes that refresh session, returns **204** (idempotent for a well-formed token) |
+| GET | `/auth/me` | Requires `Authorization: Bearer <access_token>`; returns **200** with `{"user_id":"<uuid>"}` |
+
+Registration, login, and refresh return:
+
+```json
+{
+  "access_token": "<signed JWT>",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "refresh_token": "<opaque secret>",
+  "refresh_expires_at": "<RFC 3339 timestamp>"
+}
+```
+
+The JWT uses HS256 with validated issuer, audience, subject, and expiry.
+Protected routes use the bearer-token extractor without querying PostgreSQL:
+access tokens last 15 minutes. Refresh tokens contain 256 random bits; only
+their SHA-256 hashes are stored in PostgreSQL. Refresh sessions last an absolute
+30 days from login, are rotated atomically on each refresh, and cannot be
+extended by rotation. Clients must save the replacement refresh token and
+serialize refresh requests: an old token or a concurrent second refresh gets
+**401**. Reuse rejects the old token; it does not revoke the replacement session.
+Inactive or deleted accounts cannot log in or refresh. Logout affects only the
+provided refresh session, not other devices.
+
+Because access validation is stateless, logout, account deletion, and account
+deactivation do **not** invalidate an already-issued JWT before its 15-minute
+expiry. `/auth/me` reports the token subject, not a live account profile. Future
+protected handlers must use the authenticated subject for ownership checks.
+Auth responses use `Cache-Control: no-store`; credential/token failures return
+**401**, invalid fields **400**, duplicate accounts **409**, and internal failures
+**500** without exposing database errors. Malformed JSON uses Axum's standard
+request rejection responses.
+
+Use HTTPS outside local development and store refresh tokens in platform-secure
+storage; never log tokens or put them in URLs. This is a bearer-token JSON API,
+not a cookie-based browser session. Cross-origin browser access needs an explicit
+allowed-origin policy at the gateway; CORS is not enabled by these routes.
+Before exposing the API publicly, configure rate limiting for registration,
+login, and refresh at the gateway. Periodically clean up expired refresh rows:
+
+```sql
+DELETE FROM auth_sessions WHERE expires_at <= CURRENT_TIMESTAMP;
+```
+
+Run backend unit tests with `cargo test -p showflow-backend`. Database tests are
+ignored by default and use SQLx-created isolated databases; run them against a
+disposable PostgreSQL instance with a role that can create databases:
+
+```sh
+DATABASE_URL='postgres://USER:PASSWORD@localhost:5432/postgres' \
+  cargo test -p showflow-backend -- --ignored
+```
 
 ## Run sheet times
 

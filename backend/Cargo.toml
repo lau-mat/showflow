@@ -7,3 +7,17 @@ edition = "2021"
 protocol = { path = "../protocol" }
 axum = "0.7"
 tokio = { version = "1.0", features = ["full"] }
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "migrate", "uuid", "chrono"] }
+dotenvy = { version = "0.15" }
+argon2 = "0.5"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+jsonwebtoken = "9.3"
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+sha2 = "0.10"
+uuid = { version = "1", features = ["serde", "v4"] }
+
+[dev-dependencies]
+serde_json = "1.0"
+tower = { version = "0.5", features = ["util"] }
