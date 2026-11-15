@@ -13,12 +13,38 @@ export AUTH_JWT_SECRET="$(openssl rand -hex 32)"
 docker compose build
 ```
 
-Tauri starts a dedicated Vite server on `127.0.0.1:1420` serving
-`frontend/main`. Desktop release builds package that static directory directly.
-The web image uses `frontend/Dockerfile` and the Vite configuration to build
-the same `frontend/main` entry point into the repository-root `dist` directory.
-Frontend asset references and session navigation still need updating for the
-restructured layout.
+The main app stays at `/`: `npm run dev` or `npm run dev:app` serves
+`frontend/main` (the latter on `127.0.0.1:1420`). Sessions have their own Vite
+config: `npm run dev:session` serves `frontend/session` on `127.0.0.1:1421`,
+opening `/client.html`; the controller is at `/session.html`.
+
+Both configs serve `frontend/shared` at `/shared/` and copy it into their builds.
+For example, use `/shared/js/dynamic_generator.js` and
+`/shared/style/boxes.css` from either frontend. These are public, untransformed
+assets: shared classic scripts retain their global functions. Shared TypeScript
+should instead be imported into a module entry so Vite transpiles it.
+`frontend/tsconfig.json` maps `/shared/*` for TypeScript and VS Code to match
+both Vite configs. For example, import `generateDynamic` or `dynamicPrompt` from
+`/shared/js/dynamic_generator`. The shared generator is a TypeScript module;
+its named exports are not automatically globals in classic scripts.
+Existing runtime-loaded icons are copied into `/icons/` in both builds.
+
+`npm run build` builds sessions into `dist/session`, then the main app into
+`dist/main`. The main build also includes the built session pages under
+`/session/` for the Tauri controller window. Run `npm run build:session` before
+starting the main Vite server for the first time, and rerun it after session
+changes when testing the embedded controller. For live session frontend changes,
+use the separate session dev server.
+
+Vite reports that the existing classic scripts cannot be bundled as modules;
+the static-copy plugin deliberately serves/copies these scripts unchanged.
+Do not add `type="module"` to those scripts without migrating their globals.
+
+Tauri builds session assets before development and both frontends before release.
+It packages `dist/main`; its embedded HTTP session server serves `dist/session`,
+including shared assets. Direct Cargo builds of the desktop app therefore need
+`npm run build` first. The web Docker image serves the main build by default;
+the optional `session` Docker build target serves the standalone session build.
 
 The Cargo workspace contains `app`, `backend`, and `protocol`, with a shared
 root `Cargo.lock`. Both backend containers build only `showflow-backend` from

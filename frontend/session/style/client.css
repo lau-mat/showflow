@@ -1,4 +1,4 @@
-@import "./colors.css";
+@import "/shared/style/colors.css";
 
 /* ── Reset & Baseline ─────────────────────────────────────────────────────── */
 * {

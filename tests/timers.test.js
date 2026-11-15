@@ -35,7 +35,7 @@ function createContext(datasets = []) {
             callbacks.delete(id);
         }
     });
-    vm.runInContext(readFileSync(new URL("../src/js/timers.js", import.meta.url), "utf8"), context);
+    vm.runInContext(readFileSync(new URL("../frontend/session/js/timers.js", import.meta.url), "utf8"), context);
     return {
         context, timers,
         tick: () => callbacks.forEach(callback => callback()),

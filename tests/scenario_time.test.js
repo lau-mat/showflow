@@ -4,12 +4,12 @@ import test from "node:test";
 import vm from "node:vm";
 
 function loadScript(context, path) {
-    vm.runInContext(readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8"), context);
+    vm.runInContext(readFileSync(new URL(`../frontend/${path}`, import.meta.url), "utf8"), context);
 }
 
 function createContext() {
     const context = vm.createContext({});
-    loadScript(context, "js/scenario_time.js");
+    loadScript(context, "shared/js/scenario_time.js");
     return context;
 }
 
@@ -53,7 +53,7 @@ test("editor and all print layouts display the same resolved start times", () =>
     const printContainer = { innerHTML: "", remove() {} };
     context.window = { __TAURI__: { core: { invoke() {} } }, print() {} };
     context.document = { getElementById: () => printContainer };
-    loadScript(context, "js/pages/edit_show.page.js");
+    loadScript(context, "main/js/pages/edit_show.page.js");
 
     const cells = context.buildEditShowLayout(data)
         .filter(item => item.classes === "line-number-cell");
@@ -73,7 +73,7 @@ test("client display and countdown share resolved start times", () => {
     context.window = { location: { hostname: "localhost" } };
     context.WebSocket = class {};
     context.document = { addEventListener() {} };
-    loadScript(context, "js/client.js");
+    loadScript(context, "session/js/client.js");
     context.showData = data;
     vm.runInContext("session.showContent = showData", context);
     data.lines.forEach((line, index) => {
@@ -87,7 +87,7 @@ test("deleting a line reloads show data to recalculate following starts", async 
     const context = createContext();
     const calls = [];
     context.window = { __TAURI__: { core: { invoke: async command => calls.push(command) } } };
-    loadScript(context, "js/pages/edit_show.page.js");
+    loadScript(context, "main/js/pages/edit_show.page.js");
     context.refreshShowData = async () => calls.push("refresh");
     await context.deleteLine(1);
     assert.deepEqual(calls, ["delete_scenario_line", "refresh"]);

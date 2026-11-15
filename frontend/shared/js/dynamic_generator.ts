@@ -1,60 +1,132 @@
-const svgCache = new Map(); 
+export type GeneratedElement = HTMLElement | SVGSVGElement;
+export type ElementTarget = string | GeneratedElement;
+type StyleValue = string | number;
+type Styles = Record<string, StyleValue>;
+type FormData = Record<string, string | number>;
+type FormErrors = Record<string, string>;
+type EventDefinitions = Record<string, EventListener>
+    | { type: string; callback: EventListener }[];
+
+export interface ElementDefinition {
+    type: string;
+    target?: string;
+    varId?: string;
+    id?: string;
+    text?: string | number;
+    html?: string;
+    classes?: string | string[];
+    attributes?: Record<string, string | number | boolean | undefined>;
+    properties?: Record<string, unknown>;
+    style?: Styles;
+    data?: Record<string, string | number | boolean>;
+    events?: EventDefinitions;
+    children?: ElementDefinition[];
+    file?: string;
+    sketch?: string;
+    pathStyle?: Record<string, StyleValue | Styles>;
+    label?: string;
+    placeholder?: string;
+    inputType?: string;
+    value?: string | number;
+    rows?: number;
+    options?: ElementDefinition[];
+}
+
+export interface BoxOptions {
+    isTemporary?: boolean;
+    modal?: boolean;
+    fullscreen?: boolean;
+    width?: string;
+    height?: string;
+}
+
+interface DialogOptions {
+    title?: string;
+    content?: ElementDefinition[];
+    classes?: string[];
+    isModal?: boolean;
+    closeOnOverlayClick?: boolean;
+    isTemporary?: boolean;
+}
+
+export interface PromptOptions {
+    title: string;
+    elements: ElementDefinition[];
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: (data: FormData) => void;
+    onCancel?: () => void;
+    onValidate?: ((data: FormData) => FormErrors | null | undefined) | null;
+    required?: boolean;
+}
+
+const svgCache = new Map<string, string>();
 const svgNamespace = "http://www.w3.org/2000/svg"; 
 const validElementTypes = [ 
   'svg', 'code', 'li', 'strong', 'small', 'pre', 'textarea', 'nav', 'section', 
   'a', 'i', 'div', 'span', 'p', 'br', 'button', 'h1', 'h2', 'h3', 'input', 
   'img', 'label', "table", "thead", "tbody", "select", "option", "tr", "td", "th", "aside", "ul",
-  "header", "main"
+  "header", "main", "tfoot"
 ];
 
-const compoundComponents = {
-    "input-label": [
-        { type: "label", attributes: { for: "&id" }, text: "&label" },
-        { type: "input", attributes: { type: "text", placeholder: "&placeholder", value: "&value" }, id: "&id" }
-    ],
-    "select-label": [
-        { type: "label", attributes: { for: "&id" }, text: "&label" },
-        { type: "select", id: "&id", children: "&options" }
-    ],
-    "textarea-label": [
-        { type: "label", attributes: { for: "&id" }, text: "&label" },
-        { type: "textarea", attributes: { rows: "&rows", placeholder: "&placeholder" }, properties: {value: "&value"}, id: "&id" }
-    ]
-};
-
-function resolveElement(elem) {
-    if (elem instanceof HTMLElement) return elem;
-    return document.querySelector(elem);
+function resolveElement(elem: ElementTarget): GeneratedElement {
+    if (elem instanceof HTMLElement || elem instanceof SVGSVGElement) return elem;
+    const element = document.querySelector(elem);
+    if (!(element instanceof HTMLElement || element instanceof SVGSVGElement)) {
+        throw new Error(`Element target not found or unsupported: ${elem}`);
+    }
+    return element;
 }
 
-function interpolateTemplate(template, props) {
-    if (typeof template === "string") {
-        if (template.startsWith("&")) {
-            const key = template.slice(1);
-            return props[key] !== undefined ? props[key] : "";
-        }
-        return template;
+function compoundChildren(definition: ElementDefinition): ElementDefinition[] | null {
+    const label: ElementDefinition = {
+        type: "label",
+        attributes: { for: definition.id },
+        text: definition.label ?? "",
+    };
+    const control: ElementDefinition = {
+        type: "",
+        id: definition.id,
+        events: definition.events,
+    };
+    switch (definition.type) {
+        case "input-label":
+            control.type = "input";
+            control.attributes = {
+                type: definition.inputType ?? "text", placeholder: definition.placeholder, value: definition.value,
+            };
+            break;
+        case "select-label":
+            control.type = "select";
+            control.children = definition.options;
+            break;
+        case "textarea-label":
+            control.type = "textarea";
+            control.attributes = { rows: definition.rows, placeholder: definition.placeholder };
+            control.properties = { value: definition.value ?? "" };
+            break;
+        default:
+            return null;
     }
-
-    if (Array.isArray(template)) {
-        return template.map(item => interpolateTemplate(item, props));
-    }
-
-    if (typeof template === "object" && template !== null) {
-        const result = {};
-        for (const [key, value] of Object.entries(template)) {
-            result[key] = interpolateTemplate(value, props);
-        }
-        return result;
-    }
-
-    return template;
+    control.attributes = { ...control.attributes, ...definition.attributes };
+    return [label, control];
 }
 
-const dynamicGenerator = ( definition, location = document.body ) => {
-    if (definition.type && compoundComponents[definition.type]) {
-    const template = compoundComponents[definition.type];
-    const interpolatedElements = interpolateTemplate(template, definition);
+function applyStyles(element: GeneratedElement, styles: Styles): void {
+    for (const [property, value] of Object.entries(styles)) {
+        const name = property.startsWith("--")
+            ? property
+            : property.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+        element.style.setProperty(name, String(value));
+    }
+}
+
+const dynamicGenerator = (
+    definition: ElementDefinition,
+    location: ElementTarget = document.body,
+): GeneratedElement => {
+    const interpolatedElements = compoundChildren(definition);
+    if (interpolatedElements) {
     
     // 1. Pass wrapper ID, style, and classes to the form-group container
     const groupContainer = dynamicGenerator({
@@ -65,28 +137,20 @@ const dynamicGenerator = ( definition, location = document.body ) => {
     }, location);
 
     // 2. Attach top-level events & attributes to the child input/select element
-    interpolatedElements.forEach(childDef => {
-        if (["select", "input", "textarea"].includes(childDef.type)) {
-            if (definition.events) childDef.events = definition.events;
-            if (definition.attributes) {
-                childDef.attributes = { ...childDef.attributes, ...definition.attributes };
-            }
-        }
-        dynamicGenerator(childDef, groupContainer);
-    });
+    interpolatedElements.forEach(childDef => dynamicGenerator(childDef, groupContainer));
 
     return groupContainer;
 }
 
-    if (!definition.type || typeof definition.type !== "string") return console.error("Invalid element type:", definition);
-    if (!validElementTypes.includes(definition.type)) return console.error("Unsupported element type:", definition.type);
+    if (!definition.type || typeof definition.type !== "string") throw new TypeError("Invalid element type");
+    if (!validElementTypes.includes(definition.type)) throw new TypeError(`Unsupported element type: ${definition.type}`);
 
-    location = resolveElement(location);
-    let item = null;
+    const container = resolveElement(location);
+    let item: GeneratedElement;
 
     switch( definition.type ) {
         case "svg":
-            let svgContent;
+            let svgContent: string;
             const hasSketch = definition.sketch !== undefined;
 
             if(hasSketch) {
@@ -95,7 +159,7 @@ const dynamicGenerator = ( definition, location = document.body ) => {
                 }
                 svgContent = definition.sketch;
             } else {
-                if(!definition.file) return console.error("trying to add svg without file reference");
+                if(!definition.file) throw new Error("SVG requires a file reference or sketch");
 
                 if(!svgCache.has(definition.file)) {
                     const request = new XMLHttpRequest();
@@ -109,7 +173,9 @@ const dynamicGenerator = ( definition, location = document.body ) => {
                     }
                 }
 
-                svgContent = svgCache.get(definition.file);
+                const cached = svgCache.get(definition.file);
+                if (cached === undefined) throw new Error(`SVG cache entry missing: ${definition.file}`);
+                svgContent = cached;
             }
 
             const parser = new DOMParser();
@@ -124,8 +190,8 @@ const dynamicGenerator = ( definition, location = document.body ) => {
                 item.setAttributeNS(attribute.namespaceURI, attribute.name, attribute.value);
             }
 
-            let generalStyle = new Map();
-            let specificStyling = new Map();
+            const generalStyle = new Map<string, StyleValue>();
+            const specificStyling = new Map<string, Styles>();
 
             if(typeof definition.pathStyle === "object") {
                 for(const key in definition.pathStyle) {
@@ -137,7 +203,6 @@ const dynamicGenerator = ( definition, location = document.body ) => {
                 }
             }
 
-            const toKebabCase = str => str.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
             const allElements = loadedSvg.querySelectorAll("*");
 
             allElements.forEach(elem => {
@@ -145,7 +210,12 @@ const dynamicGenerator = ( definition, location = document.body ) => {
                 specificStyling.forEach((styles, selector) => {
                     if(elem.matches(selector)) Object.assign(finalStyle, styles);
                 });
-                for(const prop in finalStyle) elem.style[toKebabCase(prop)] = finalStyle[prop];
+                if (elem instanceof SVGElement) {
+                    for (const [prop, value] of Object.entries(finalStyle)) {
+                        const name = prop.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+                        elem.style.setProperty(name, String(value));
+                    }
+                }
             });
 
             while(loadedSvg.firstChild) item.appendChild(loadedSvg.firstChild);
@@ -153,7 +223,7 @@ const dynamicGenerator = ( definition, location = document.body ) => {
 
         default:
             item = document.createElement(definition.type);
-            if (definition.text !== undefined) item.innerText = definition.text;
+            if (definition.text !== undefined) item.innerText = String(definition.text);
             else if (definition.html !== undefined) item.innerHTML = definition.html;
     }
 
@@ -165,64 +235,67 @@ const dynamicGenerator = ( definition, location = document.body ) => {
         }
     } catch(e) {
         console.error(definition);
-        throw Error(e);
+        throw e;
     }
 
     if (typeof definition.attributes === "object") {
         for (const attribute in definition.attributes) {
             // Strip out empty attributes resulting from optional template parameters
             if (definition.attributes[attribute] !== "" && definition.attributes[attribute] !== undefined) {
-                item.setAttribute(attribute, definition.attributes[attribute]);
+                item.setAttribute(attribute, String(definition.attributes[attribute]));
             }
         }
     }
-    if(typeof definition.style === "object")
-        for(const style in definition.style) item.style[style] = definition.style[style];
+    if(typeof definition.style === "object") applyStyles(item, definition.style);
 
     if(typeof definition.properties === "object")
-        for(const property in definition.properties) item[property] = definition.properties[property];
+        for(const property in definition.properties) {
+            if (!Reflect.set(item, property, definition.properties[property])) {
+                throw new Error(`Unable to set element property: ${property}`);
+            }
+        }
 
     if (definition.id !== undefined && typeof definition.id === "string") item.id = definition.id;
 
     if(definition.data !== undefined && typeof definition.data === "object") {
-        Object.keys(definition.data).forEach(tag => item.dataset[tag] = definition.data[tag]);
+        const data = definition.data;
+        Object.keys(data).forEach(tag => item.dataset[tag] = String(data[tag]));
     }
 
     if(Array.isArray(definition.events)) {
         definition.events.forEach(event => {
             if(event.type !== undefined && event.callback !== undefined) {
-                item.addEventListener(event.type, event.callback.bind(this));
+                item.addEventListener(event.type, event.callback);
             }
         });
     } else if(typeof definition.events === "object") {
-        for(const event in definition.events) item.addEventListener(event, definition.events[event].bind(this));
+        for(const event in definition.events) item.addEventListener(event, definition.events[event]);
     }
 
     if(definition.children !== undefined && Array.isArray(definition.children)) {
         definition.children.forEach(child => dynamicGenerator(child, item));
     }
 
-    location.append(item);
+    container.append(item);
     return item;
 };
 
-const generateDynamic = (definition, location = document.body) => {
-    if(!Array.isArray(definition)) return console.error("Definition is not an array");
-    let ids = {};
-    location = resolveElement(location);
+const generateDynamic = (definition: ElementDefinition[], location: ElementTarget = document.body): Record<string, GeneratedElement> => {
+    if(!Array.isArray(definition)) throw new TypeError("Definition is not an array");
+    const ids: Record<string, GeneratedElement> = {};
+    const container = resolveElement(location);
 
     definition.forEach(item => {
-        let target;
+        let target: GeneratedElement | undefined;
         if(item.target === undefined) {
-            target = location;
+            target = container;
         } else if(item.target.startsWith("@") && ids[item.target.slice(1)]) {
             target = ids[item.target.slice(1)];
         } else if(item.target !== undefined && item.target.charAt(0) !== "@") {
-            target = document.querySelector(item.target);
+            target = resolveElement(item.target);
         }
         if(!target) {
-            console.error("Invalid target selector:", item.target, item);
-            return;
+            throw new Error(`Invalid target selector: ${item.target}`);
         }
         const elem = dynamicGenerator(item, target);
         if(item.varId !== undefined) ids[item.varId] = elem;
@@ -231,15 +304,17 @@ const generateDynamic = (definition, location = document.body) => {
     return ids;
 };
 
-const cleanContainer = elem => {
+const cleanContainer = (elem: ElementTarget): void => {
     const container = resolveElement(elem);
     while (container.firstChild) container.removeChild(container.firstChild);
 };
 
 class StackManager {
+    stack: BaseDialog[] = [];
+    readonly baseZIndex = 1000;
+    readonly overlay: HTMLDivElement;
+
     constructor() {
-        this.stack = [];
-        this.baseZIndex = 1000;
         
         // Single shared backdrop overlay element driven by boxes.css
         this.overlay = document.createElement("div");
@@ -249,14 +324,14 @@ class StackManager {
         document.body.appendChild(this.overlay);
     }
 
-    push(dialog) {
+    push(dialog: BaseDialog) {
         if (!this.stack.includes(dialog)) {
             this.stack.push(dialog);
             this.updateZIndices();
         }
     }
 
-    remove(dialog) {
+    remove(dialog: BaseDialog) {
         this.stack = this.stack.filter(d => d !== dialog);
         this.updateZIndices();
     }
@@ -271,12 +346,13 @@ class StackManager {
         document.body.style.overflow = "hidden";
 
         // Find highest modal requiring a backdrop
-        const topModalIndex = this.stack.findLastIndex(d => d.isModal);
+        let topModalIndex = this.stack.length - 1;
+        while (topModalIndex >= 0 && !this.stack[topModalIndex].isModal) topModalIndex--;
 
         if (topModalIndex !== -1) {
             const overlayZ = this.baseZIndex + (topModalIndex * 10);
             this.overlay.style.display = "block";
-            this.overlay.style.zIndex = overlayZ;
+            this.overlay.style.zIndex = String(overlayZ);
         } else {
             this.overlay.style.display = "none";
         }
@@ -284,7 +360,7 @@ class StackManager {
         // Adjust each dialog's z-index sequentially
         this.stack.forEach((dialog, index) => {
             const dialogZ = this.baseZIndex + (index * 10) + 5;
-            dialog.container.style.zIndex = dialogZ;
+            dialog.container.style.zIndex = String(dialogZ);
         });
     }
 
@@ -299,6 +375,15 @@ class StackManager {
 const DialogStack = new StackManager();
 
 class BaseDialog {
+    readonly isModal: boolean;
+    readonly closeOnOverlayClick: boolean;
+    readonly isTemporary: boolean;
+    readonly contentDefinition: ElementDefinition[];
+    container!: GeneratedElement;
+    body!: GeneratedElement;
+    header!: GeneratedElement;
+    content: Record<string, GeneratedElement> = {};
+
     constructor({ 
         title = "", 
         content = [], 
@@ -306,7 +391,7 @@ class BaseDialog {
         isModal = true, 
         closeOnOverlayClick = true,
         isTemporary = false 
-    }) {
+    }: DialogOptions) {
         this.isModal = isModal;
         this.closeOnOverlayClick = closeOnOverlayClick;
         this.isTemporary = isTemporary;
@@ -315,7 +400,7 @@ class BaseDialog {
         this.buildWindow(title, classes);
     }
 
-    buildWindow(title, extraClasses) {
+    buildWindow(title: string, extraClasses: string[]) {
         const dialogClasses = ["dialog-box", ...extraClasses];
         
         const items = generateDynamic([
@@ -356,7 +441,7 @@ class BaseDialog {
 /**
  * Custom Promise-based dynamic form prompt modal
  */
-const dynamicPrompt = ({ 
+const dynamicPrompt = ({
     title, 
     elements, 
     confirmText = "Save", 
@@ -365,11 +450,11 @@ const dynamicPrompt = ({
     onCancel, 
     onValidate = null,
     required = false
-}) => {
+}: PromptOptions): Promise<FormData | null> => {
     return new Promise((resolve, reject) => {
-        let promptDialog;
+        let promptDialog: BaseDialog;
 
-        const clearErrors = (modalEl) => {
+        const clearErrors = (modalEl: GeneratedElement) => {
             modalEl.querySelectorAll('.modal-error-message').forEach(el => el.remove());
             modalEl.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
             modalEl.querySelectorAll('[aria-invalid="true"]').forEach(el => el.removeAttribute('aria-invalid'));
@@ -385,10 +470,10 @@ const dynamicPrompt = ({
             const modalEl = promptDialog.container;
             clearErrors(modalEl);
 
-            const data = {};
-            modalEl.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+            const data: FormData = {};
+            modalEl.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>('input[id], select[id], textarea[id]').forEach(el => {
                 if (el.id) {
-                    data[el.id] = el.type === 'number' ? el.valueAsNumber : el.value;
+                    data[el.id] = el instanceof HTMLInputElement && el.type === 'number' ? el.valueAsNumber : el.value;
                 }
             });
 
@@ -399,6 +484,9 @@ const dynamicPrompt = ({
                         const errorTarget = modalEl.querySelector(`#${CSS.escape(inputId)}`);
                         if (errorTarget) {
                             const fieldGroup = errorTarget.closest('.form-group') || errorTarget.parentElement;
+                            if (!(fieldGroup instanceof HTMLElement)) {
+                                throw new Error(`Missing form group for: ${inputId}`);
+                            }
                             const controls = errorTarget.matches('input, select, textarea')
                                 ? [errorTarget]
                                 : Array.from(fieldGroup.querySelectorAll('input, select, textarea'));
@@ -431,7 +519,7 @@ const dynamicPrompt = ({
             target: el.target ?? '@modalContent'
         }));
 
-        const promptDefinition = [
+        const promptDefinition: ElementDefinition[] = [
             { type: "div", classes: "modal-body-wrapper", varId: "modalContent" },
             { type: "div", classes: "modal-footer", varId: "modalFooter" },
             ...(!required ? [{
@@ -471,10 +559,12 @@ const dynamicPrompt = ({
 /**
  * HoverBox instance logic
  */
-let boxes = {};
+const boxes: Record<string, Box> = {};
 
 class Box extends BaseDialog {
-    constructor(title, content, options = {}) {
+    readonly options: BoxOptions;
+
+    constructor(title: string, content: ElementDefinition[], options: BoxOptions = {}) {
         const isTemporary = options.isTemporary ?? false;
         const isModal = options.modal ?? true;
 
@@ -505,7 +595,7 @@ class Box extends BaseDialog {
         }
     }
 
-    refreshContent(content) {
+    refreshContent(content: ElementDefinition[]) {
         cleanContainer(this.body);
         this.content = generateDynamic(content, this.body);
     }
@@ -514,7 +604,7 @@ class Box extends BaseDialog {
     closeBox() { this.close(); }
 }
 
-function addHoverBox(id, title, content, options = {}) {
+function addHoverBox(id: string | null, title: string, content: ElementDefinition[], options: BoxOptions = {}): Box {
     if (id === null) {
         if (options.isTemporary === undefined) options.isTemporary = true;
         let tempBox = new Box(title, content, options);
@@ -524,3 +614,13 @@ function addHoverBox(id, title, content, options = {}) {
         return boxes[id];
     }
 }
+
+export {
+    addHoverBox,
+    boxes,
+    dynamicPrompt,
+    dynamicGenerator,
+    generateDynamic,
+    dynamicGenerator as dynamic_generator,
+    generateDynamic as generate_dynamic,
+};

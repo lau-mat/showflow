@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="stylesheet" href="style/styles.css" />
-    <link rel="stylesheet" href="style/boxes.css" />
+    <link rel="stylesheet" href="/shared/style/boxes.css" />
     <link rel="stylesheet" href="style/print.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ShowFlow</title>
@@ -15,49 +15,9 @@
       <h1 class="brand-title">Show<span class="brand-accent">Flow</span></h1>
     </header>
 
-    <main>
-      <div id="sessionDiscovery">
-        <table id="discoveredSessions">
-          <thead>
-            <tr>
-              <th>Session Name</th>
-              <th>Session ID</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="discoveredSessionsTableBody">
-            <tr>
-              <td style="text-align: center;" colspan="3">No sessions discovered yet.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div id="editShows">
-        <table id="editShowsTable">
-          <thead>
-            <tr>
-              <th>Session Name</th>
-              <th>Start Time</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="editShowsTableBody"></tbody>
-          <tfoot>
-            <tr>
-              <td colspan="3" class="create-show-cell">
-                <button id="createShowBtn" type="button">
-                  <span class="plus-icon">+</span> Create New Show
-                </button>
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </main>
-    <script src="/js/dynamic_generator.js" defer></script>
-    <script src="/js/scenario_time.js" defer></script>
+    <main id="mainSection"></main>
+    <script src="/shared/js/scenario_time.js" defer></script>
     <script src="/js/pages/edit_show.page.js" defer></script>
-    <script type="module" src="/js/main.js" defer></script>
+    <script type="module" src="/js/main.ts" defer></script>
   </body>
 </html>

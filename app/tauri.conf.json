@@ -4,9 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.laurens.showfow",
   "build": {
-    "beforeDevCommand": "npm run dev:app",
+    "beforeDevCommand": "npm run build:session && npm run dev:app",
     "devUrl": "http://127.0.0.1:1420",
-    "frontendDist": "../frontend/main"
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist/main"
   },
   "app": {
     "withGlobalTauri": true,

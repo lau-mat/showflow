@@ -270,7 +270,7 @@ where
 }
 
 #[derive(RustEmbed, Clone)]
-#[folder = "../frontend/session/"]
+#[folder = "../dist/session/"]
 struct Asset;
 
 async fn static_handler(uri: Uri) -> impl IntoResponse {
@@ -429,7 +429,7 @@ pub async fn start_session(show_id: i64, state: State<'_, AppState>, db_state: S
     WebviewWindowBuilder::new(
         &app_handle,
         "session-manager",
-        WebviewUrl::App("session.html".into())
+        WebviewUrl::App("session/session.html".into())
     )
     .title("Session Management")
     .inner_size(1024.0, 768.0)

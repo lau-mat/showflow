@@ -9,11 +9,16 @@ RUN npm ci
 # Copy the frontend source and Vite configuration
 COPY . ./
 
-# Build frontend/main into the repository-root dist directory
+# Build the main and session frontends with shared resources
 RUN npm run build
 
 # Stage 2: Serve via Nginx
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
+FROM nginx:alpine AS session
+COPY --from=builder /app/dist/session /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+
+FROM nginx:alpine AS main
+COPY --from=builder /app/dist/main /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

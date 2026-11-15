@@ -6,11 +6,19 @@
   "scripts": {
     "tauri": "tauri",
     "dev": "vite",
-    "dev:app": "vite frontend/main --host 127.0.0.1 --port 1420 --strictPort",
-    "build": "vite build"
+    "dev:app": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "dev:session": "vite --config vite.session.config.js --host 127.0.0.1 --port 1421 --strictPort --open /client.html",
+    "build": "npm run build:session && npm run build:main",
+    "build:main": "vite build",
+    "build:session": "vite build --config vite.session.config.js"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
-    "vite": "^8.3.8"
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vite-plugin-static-copy": "^3.0.0"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.12.4"
   }
 }

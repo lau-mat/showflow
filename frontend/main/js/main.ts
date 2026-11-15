@@ -1,10 +1,31 @@
-const { invoke } = window.__TAURI__.core;
-const { listen } = window.__TAURI__.event;
+const isApp = isTauriProtocol();
 
-let shows = null;
+async function bootstrap(): Promise<void> {
+  if (isApp) {
+    await import("./app.ts");
+  } else {
+    await import("./browser.ts");
+  }
+}
+
+bootstrap().catch(console.error);
+
+export function isTauriProtocol(): boolean {
+  if (typeof window === 'undefined') {
+    return false; // Running server-side or in SSR
+  }
+
+  // Tauri v1 and v2 injects these global objects into the webview
+  return Boolean(
+    (window as any).__TAURI__ || 
+    (window as any).__TAURI_INTERNALS__
+  );
+}
+
+let shows: {id: number, name: string, time: number}[] = [];
 const btnAddShow = document.getElementById("createShowBtn");
 
-function addShowItem(id, name, time){
+function addShowItem(id: number, name: string, time: number){
   const date = new Date(time * 1000);
   const item = generateDynamic([
     {type: "tr", varId: "row"},
@@ -27,7 +48,7 @@ function addShowItem(id, name, time){
   item.startSession.addEventListener("click", e => startSession(id, item.startSession))
 }
 
-btnAddShow.addEventListener("click", async () => {
+btnAddShow?.addEventListener("click", async () => {
   const newShowData = await dynamicPrompt({
     title: "New Show Details",
     confirmText: "Create",
@@ -48,25 +69,20 @@ btnAddShow.addEventListener("click", async () => {
 
   const unixTimestamp = Math.floor(new Date(newShowData.newShowTime).getTime() / 1000);
 
-  const newShowId = await invoke('new_show', {name: newShowData.newShowName, time: unixTimestamp});
+  const newShowId = await invoke('new_show', {name: newShowData.newShowName, time: unixTimestamp}) as {id: number};
 
   shows.push({id: newShowId, name: newShowData.newShowName, time: unixTimestamp});
   addShowItem(newShowId.id, newShowData.newShowName, unixTimestamp);
 });
 
-async function startSession(id, button){
+async function startSession(id: number, button: HTMLElement){
   const sessionResponse = await invoke("start_session", {showId: id})
   button.classList.add("session-active");
 }
 
 async function init(){
-  shows = await invoke("get_shows");
+  shows = await invoke("get_shows") as {id: number, name: string, time: number}[];
   shows.forEach(show => addShowItem(show.id, show.name, show.time));
 }
-
-listen("session-stopped", () => {
-  const button = document.querySelector("svg.btn-icon.session-active");
-  button.classList.remove("session-active");
-})
 
 init();
