@@ -49,6 +49,10 @@ shows a "Validating..." status and spinner and disables field editing and repeat
 submission. Optional prompts can still be dismissed; late validation results
 are ignored. A thrown error or rejected validation promise closes the prompt
 and rejects its promise, so callers should handle server/network failures.
+Set `isModal: false` to open a prompt without requesting a backdrop; the default
+is `true`. Other open modal dialogs can still require the shared backdrop.
+Non-modal prompts retain the existing scroll lock and cannot be dismissed by
+clicking outside when no backdrop is present.
 
 `npm run build` builds sessions into `dist/session`, then the main app into
 `dist/main`. The main build also includes the built session pages under

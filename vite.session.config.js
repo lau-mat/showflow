@@ -13,7 +13,6 @@ export default defineConfig({
     viteStaticCopy({
       targets: [
         { src: fileURLToPath(new URL('./frontend/shared', import.meta.url)), dest: '.' },
-        { src: fileURLToPath(new URL('./frontend/session/js', import.meta.url)), dest: '.' },
         { src: fileURLToPath(new URL('./frontend/main/icons', import.meta.url)), dest: '.' },
       ],
     }),

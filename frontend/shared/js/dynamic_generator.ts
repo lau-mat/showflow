@@ -59,6 +59,7 @@ export interface PromptOptions {
     onCancel?: () => void;
     onValidate?: ((data: FormData) => ValidationResult | Promise<ValidationResult>) | null;
     required?: boolean;
+    isModal?: boolean;
 }
 
 const svgCache = new Map<string, string>();
@@ -452,7 +453,8 @@ const dynamicPrompt = ({
     onConfirm, 
     onCancel, 
     onValidate = null,
-    required = false
+    required = false,
+    isModal = true
 }: PromptOptions): Promise<FormData | null> => {
     return new Promise((resolve, reject) => {
         let promptDialog: BaseDialog;
@@ -591,7 +593,7 @@ const dynamicPrompt = ({
             title,
             content: promptDefinition,
             classes: ["modal-box"],
-            isModal: true,
+            isModal,
             isTemporary: true,
             closeOnOverlayClick: !required
         });

@@ -1,4 +1,16 @@
-function resolveScenarioLineStartTimestamp(showStart, lines, lineIndex) {
+// Values may arrive as numeric strings (e.g. form data or session payloads).
+type NumericInput = number | string | null | undefined;
+
+export interface ScenarioTimingLine {
+    absolute_time?: NumericInput;
+    duration?: NumericInput;
+}
+
+export function resolveScenarioLineStartTimestamp(
+    showStart: NumericInput,
+    lines: readonly ScenarioTimingLine[],
+    lineIndex: number
+): number | null {
     let nextStart = Number(showStart);
     if (!Number.isFinite(nextStart)) return null;
 
@@ -13,7 +25,7 @@ function resolveScenarioLineStartTimestamp(showStart, lines, lineIndex) {
     return null;
 }
 
-function formatScenarioLineTime(timestamp) {
+export function formatScenarioLineTime(timestamp: number | null | undefined): string {
     if (timestamp == null) throw new Error("Unable to determine scenario line start time.");
     return new Date(timestamp * 1000).toLocaleTimeString("en-GB", {
         hour: "2-digit",
@@ -23,7 +35,7 @@ function formatScenarioLineTime(timestamp) {
     });
 }
 
-function formatScenarioLineDuration(duration) {
+export function formatScenarioLineDuration(duration: number): string {
     const hours = Math.floor(duration / 3600);
     const minutes = Math.floor((duration % 3600) / 60);
     const seconds = duration % 60;

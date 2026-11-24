@@ -1,4 +1,34 @@
-const timerSources = {
+import { dynamicGenerator, type GeneratedElement } from "/shared/js/dynamic_generator";
+import type { SessionState } from "/shared/js/session_types";
+import type { ShowDetails } from "/shared/js/show_types";
+
+export interface TimerParts {
+    HH: number;
+    MM: number;
+    SS: number;
+    totalMinutes?: number;
+    negative?: boolean;
+    overdue?: boolean;
+    warning?: boolean;
+    remainingFraction?: number;
+}
+
+export interface TimerState {
+    showData?: Pick<ShowDetails, "lines"> | null;
+    sessionData?: Partial<SessionState> | null;
+}
+
+type TimerSource = (now: Date, state: TimerState) => TimerParts | null;
+
+interface TimerEntry {
+    timer: HTMLElement;
+    label: GeneratedElement;
+    value: GeneratedElement;
+    progress?: HTMLElement;
+    fill?: HTMLElement;
+}
+
+export const timerSources: Record<string, TimerSource> = {
     "system-clock": now => ({
         HH: now.getHours(),
         MM: now.getMinutes(),
@@ -12,8 +42,7 @@ const timerSources = {
     "current-item": (now, { showData, sessionData }) => {
         if (!showData || !sessionData?.current_cue || sessionData.cue_started_at == null) return null;
         const lines = [...showData.lines].sort((a, b) => a.order - b.order);
-        const index = sessionData.current_cue - 1;
-        const line = lines[index];
+        const line = lines[sessionData.current_cue - 1];
         if (!line) return null;
         const duration = Number(line.duration);
         const remaining = sessionData.cue_started_at + duration - now.getTime() / 1000;
@@ -26,7 +55,7 @@ const timerSources = {
     }
 };
 
-function timerDurationParts(seconds) {
+export function timerDurationParts(seconds: number): TimerParts {
     if (!Number.isFinite(seconds)) throw new Error("Invalid timer duration.");
     const absolute = Math.abs(seconds);
     return {
@@ -38,18 +67,22 @@ function timerDurationParts(seconds) {
     };
 }
 
-function formatTimerTime(parts, format = "HH-MM-SS") {
+export function formatTimerTime(parts: TimerParts | null, format = "HH-MM-SS"): string {
     const formatted = format.replace(/-/g, ":").replace(/HH|MM|SS/g, token => {
         if (parts == null) return "--";
-        const value = token === "MM" && !format.includes("HH") && parts.totalMinutes != null
-            ? parts.totalMinutes : parts[token];
+        const key = token as "HH" | "MM" | "SS";
+        const value = key === "MM" && !format.includes("HH") && parts.totalMinutes != null
+            ? parts.totalMinutes : parts[key];
         return String(value).padStart(2, "0");
     });
     return parts?.negative ? `-${formatted}` : formatted;
 }
 
-function startTimers(root = document, getState = () => ({})) {
-    const timers = Array.from(root.querySelectorAll(".timer"), timer => {
+export function startTimers(
+    root: ParentNode = document,
+    getState: () => TimerState = () => ({})
+): () => void {
+    const timers = Array.from(root.querySelectorAll<HTMLElement>(".timer"), (timer): TimerEntry => {
         const label = dynamicGenerator({
             type: "div", classes: "timerLabel", text: timer.dataset.label
         }, timer);
@@ -59,14 +92,15 @@ function startTimers(root = document, getState = () => ({})) {
         return { timer, label, value };
     });
 
-    function updateTimer(entry) {
+    function updateTimer(entry: TimerEntry): void {
         const now = new Date();
         const state = getState();
         const { timer, label, value } = entry;
-        const source = timerSources[timer.dataset.source];
-        if (!Object.hasOwn(timerSources, timer.dataset.source)) {
-            throw new Error(`Unknown timer source: ${timer.dataset.source}`);
+        const sourceName = timer.dataset.source ?? "";
+        if (!Object.hasOwn(timerSources, sourceName)) {
+            throw new Error(`Unknown timer source: ${sourceName}`);
         }
+        const source = timerSources[sourceName];
 
         const labelText = timer.dataset.label || "";
         if (label.textContent !== labelText) label.textContent = labelText;
@@ -81,13 +115,13 @@ function startTimers(root = document, getState = () => ({})) {
                 type: "div",
                 classes: "timerProgress",
                 attributes: { role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100" }
-            }, timer);
+            }, timer) as HTMLElement;
             entry.fill = dynamicGenerator({
                 type: "div", classes: "timerProgressFill",
                 attributes: { "aria-hidden": "true" }
-            }, entry.progress);
+            }, entry.progress) as HTMLElement;
         }
-        if (entry.progress) {
+        if (entry.progress && entry.fill) {
             entry.progress.hidden = parts?.remainingFraction == null;
             const percent = (parts?.remainingFraction ?? 0) * 100;
             entry.fill.style.width = `${percent}%`;

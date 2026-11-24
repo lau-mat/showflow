@@ -1,17 +1,15 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
-import vm from "node:vm";
+import "./helpers/ts_hooks.js";
 
-function loadScript(context, path) {
-    vm.runInContext(readFileSync(new URL(`../frontend/${path}`, import.meta.url), "utf8"), context);
-}
+const scenarioTime = await import("../frontend/shared/js/scenario_time.ts");
+const editShow = await import("../frontend/main/js/pages/edit_show.page.ts");
 
-function createContext() {
-    const context = vm.createContext({});
-    loadScript(context, "shared/js/scenario_time.js");
-    return context;
-}
+// client.ts opens its websocket and registers listeners on import.
+globalThis.window = { location: { hostname: "localhost" } };
+globalThis.WebSocket = class {};
+globalThis.document = { addEventListener() {} };
+const client = await import("../frontend/session/js/client.ts");
 
 const showStart = new Date(2026, 9, 15, 20, 0, 0).getTime() / 1000;
 const data = {
@@ -29,16 +27,16 @@ const data = {
 const expected = ["20:00:00", "20:01:00", "20:10:00", "20:10:30", "20:10:30"];
 
 test("relative starts accumulate previous durations and explicit starts reset the schedule", () => {
-    const context = createContext();
+    const { resolveScenarioLineStartTimestamp, formatScenarioLineTime } = scenarioTime;
     data.lines.forEach((line, index) => {
-        const start = context.resolveScenarioLineStartTimestamp(data.show.time, data.lines, index);
-        assert.equal(context.formatScenarioLineTime(start), expected[index]);
+        const start = resolveScenarioLineStartTimestamp(data.show.time, data.lines, index);
+        assert.equal(formatScenarioLineTime(start), expected[index]);
     });
     assert.equal(data.lines[1].absolute_time, null);
 });
 
 test("times roll over midnight and accept numeric strings and epoch-zero anchors", () => {
-    const context = createContext();
+    const context = scenarioTime;
     const start = new Date(2026, 9, 15, 23, 59, 30).getTime() / 1000;
     const lines = [{ duration: "60" }, { duration: 10 }];
     assert.equal(context.formatScenarioLineTime(
@@ -49,18 +47,16 @@ test("times roll over midnight and accept numeric strings and epoch-zero anchors
 });
 
 test("editor and all print layouts display the same resolved start times", () => {
-    const context = createContext();
     const printContainer = { innerHTML: "", remove() {} };
-    context.window = { __TAURI__: { core: { invoke() {} } }, print() {} };
-    context.document = { getElementById: () => printContainer };
-    loadScript(context, "main/js/pages/edit_show.page.js");
+    globalThis.window = { print() {} };
+    globalThis.document = { getElementById: () => printContainer };
 
-    const cells = context.buildEditShowLayout(data)
+    const cells = editShow.buildEditShowLayout(data)
         .filter(item => item.classes === "line-number-cell");
-    assert.deepEqual(Array.from(cells, cell => cell.text), expected);
+    assert.deepEqual(cells.map(cell => cell.children[0].text), expected);
 
     for (const printMode of ["director", "single_role", "all_roles_separate"]) {
-        context.generateAndPrintSheet(data, { printMode, roleSelect: "1" });
+        editShow.generateAndPrintSheet(data, { printMode, roleSelect: "1" });
         const times = [...printContainer.innerHTML.matchAll(
             /class="col-time"><strong>(.*?)<\/strong>/g
         )].map(match => match[1]);
@@ -69,26 +65,20 @@ test("editor and all print layouts display the same resolved start times", () =>
 });
 
 test("client display and countdown share resolved start times", () => {
-    const context = createContext();
-    context.window = { location: { hostname: "localhost" } };
-    context.WebSocket = class {};
-    context.document = { addEventListener() {} };
-    loadScript(context, "session/js/client.js");
-    context.showData = data;
-    vm.runInContext("session.showContent = showData", context);
+    client.session.showContent = data;
     data.lines.forEach((line, index) => {
-        assert.equal(context.formatCueTime(data.lines, index), expected[index]);
-        assert.equal(context.resolveCueStartTimestamp(data.lines, index),
-            context.resolveScenarioLineStartTimestamp(showStart, data.lines, index));
+        assert.equal(client.formatCueTime(data.lines, index), expected[index]);
+        assert.equal(client.resolveCueStartTimestamp(data.lines, index),
+            scenarioTime.resolveScenarioLineStartTimestamp(showStart, data.lines, index));
     });
 });
 
 test("deleting a line reloads show data to recalculate following starts", async () => {
-    const context = createContext();
     const calls = [];
-    context.window = { __TAURI__: { core: { invoke: async command => calls.push(command) } } };
-    loadScript(context, "main/js/pages/edit_show.page.js");
-    context.refreshShowData = async () => calls.push("refresh");
-    await context.deleteLine(1);
-    assert.deepEqual(calls, ["delete_scenario_line", "refresh"]);
+    globalThis.__invoke = async command => {
+        calls.push(command);
+        return command === "get_full_show_details" ? data : undefined;
+    };
+    await editShow.deleteLine(1);
+    assert.deepEqual(calls, ["delete_scenario_line", "get_full_show_details"]);
 });

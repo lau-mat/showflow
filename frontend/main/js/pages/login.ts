@@ -18,6 +18,7 @@ async function createLoginPage() {
         ],
         confirmText: "Login",
         required: true,
+        isModal: false,
         onValidate: async data =>  {
             const { email, password } = data;
 
