@@ -181,6 +181,8 @@ export function createRestShareApi(client: RestClient): ShareApi {
         members: showId => client.request<Member[]>(`${show(showId)}/members`, { authorized: true }),
         setRole: (showId, userId, role) =>
             client.request<void>(`${show(showId)}/members/${userId}`, { method: "PATCH", body: { role }, authorized: true }),
+        setCaller: (showId, userId, canCall) =>
+            client.request<void>(`${show(showId)}/members/${userId}`, { method: "PATCH", body: { can_call: canCall }, authorized: true }),
         removeMember: (showId, userId) =>
             client.request<void>(`${show(showId)}/members/${userId}`, { method: "DELETE", authorized: true }),
         invites: showId => client.request<InviteInfo[]>(`${show(showId)}/invites`, { authorized: true }),

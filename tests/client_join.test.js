@@ -3,7 +3,7 @@ import test from "node:test";
 import "./helpers/ts_hooks.js";
 import { FakeWebSocket, installFakeBrowser, sessionState, show } from "./helpers/fake_browser.js";
 
-const { storage } = installFakeBrowser();
+const { storage, navigations } = installFakeBrowser();
 globalThis.__dynamicPrompt = async () => ({ userName: "Alex", roleId: "7" });
 
 const client = await import("../frontend/session/js/client.ts");
@@ -25,4 +25,15 @@ test("a new client joins with the chosen role and stores the id the server confi
     assert.equal(storage.get("client_id"), "mine");
     assert.equal(client.session.clientId, "mine");
     assert.equal(client.session.sessionData.joined_users.length, 2);
+});
+
+test("becoming caller from the crew page moves the device to the caller view", () => {
+    socket.receive({
+        command: "welcome", protocol: 2, session_id: "s9", show_id: "show-1", nonce: "n",
+        policy: { open: true, code: false, request: false, account: false },
+        view_policy: { open: true, code: false, request: false, account: false }
+    });
+    socket.receive({ command: "caller_status", state: "granted", reason: null, resume_token: "tok" });
+    assert.equal(storage.get("showflow.caller.s9"), "tok");
+    assert.deepEqual(navigations.at(-1), ["assign", "session.html?ws=47123"]);
 });

@@ -1,10 +1,11 @@
-import { addHoverBox, dynamicGenerator, dynamicPrompt, type ElementDefinition } from "/shared/js/dynamic_generator";
+import { addHoverBox, dynamicGenerator, dynamicPrompt, generateDynamic, type ElementDefinition } from "/shared/js/dynamic_generator";
 import "/shared/js/compound_components";
 import { hasFeature } from "/shared/js/platform";
 import { formatScenarioLineDuration, formatScenarioLineTime, resolveScenarioLineStartTimestamp } from "/shared/js/scenario_time";
 import { composeDateTime, decomposeDateTime } from "/shared/js/time_math";
 import { getApi } from "../api";
 import type { LineEdit, ShowEdit } from "../api/types";
+import { openSessionSettings } from "./session_settings";
 import { openShareBox } from "./share_show";
 import { canComment, canEditContent, sortCommentsByRole, type ScenarioLine, type ScenarioLineComment, type ShowDetails, type ShowRole } from "/shared/js/show_types";
 
@@ -105,6 +106,10 @@ function buildEditShowLayout(data: ShowDetails): ElementDefinition[] {
             { type: "svg", classes: ["btn-icon", "btn-outline-primary"], file: "icons/add.svg", attributes: { title: "Add cue" }, events: { click: addLine }, target: "@mainHeaderActions" },
             { type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/edit.svg", attributes: { title: "Edit show details" }, events: { click: editShowDetails }, target: "@mainHeaderActions" }
         ] : []),
+        // Who may join and call this show's sessions: a setting of this computer, whatever the role.
+        ...(hasFeature("sessionHost")
+            ? [{ type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/settings.svg", attributes: { title: "Session settings" }, events: { click: () => { void openSessionSettings(data.show); } }, target: "@mainHeaderActions" }]
+            : []),
         { type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/share.svg", attributes: { title: "Share" }, events: { click: () => openShareBox(data.show.id, data.show.name, role) }, target: "@mainHeaderActions" },
         ...(hasFeature("print")
             ? [{ type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/print.svg", events: { click: openPrintDialog }, target: "@mainHeaderActions" }]
@@ -499,12 +504,14 @@ async function openPrintDialog(): Promise<void> {
     generateAndPrintSheet(showData, options);
 }
 
-function generateAndPrintSheet(data: ShowDetails, options: PromptData): void {
-    const printContainer = document.getElementById("print-container")
-        ?? dynamicGenerator({ type: "div", id: "print-container" }, document.body);
-
+/**
+ * The printable run sheet: one A4 section per page. Cue names, notes, comments and role names are
+ * written by whoever the show is shared with, so they only ever go in as `text`, never as markup.
+ */
+function printSheetContent(data: ShowDetails, options: PromptData): ElementDefinition[] {
     const showTitle = data.show.name || "Show Run Sheet";
     const formattedDate = new Date(data.show.time * 1000).toLocaleString();
+    const generatedAt = new Date().toLocaleTimeString();
 
     // Helper: Identify General / Global comments
     const isGeneralComment = (comment: ScenarioLineComment): boolean => {
@@ -513,88 +520,89 @@ function generateAndPrintSheet(data: ShowDetails, options: PromptData): void {
         return !role || role.name.toLowerCase() === "general";
     };
 
-    // Helper to build a single printable A4 page sheet
-    const buildSheetSection = (titleSub: string, commentsList: ScenarioLineComment[]): string => {
-        const tableRowsHtml = data.lines.map((line, index) => {
-            const lineComments = commentsList.filter(c => c.line_id === line.id);
-
-            const commentsHtml = lineComments.length > 0
-                ? sortCommentsByRole(lineComments, data.roles).map(c => {
-                    const role = data.roles.find(r => r.id === c.role_id)?.name || "General";
-                    const cleanText = (c.comment || '').trim().replaceAll('\n', '<br>');
-                    return `<div class="print-comment-card"><span class="print-comment-role">${role}</span><div class="print-comment-text">${cleanText}</div></div>`;
-                }).join("")
-                : `<span class="print-empty-text">—</span>`;
-
-            return `
-                <tr>
-                    <td class="col-time"><strong>${formatScenarioLineTime(resolveScenarioLineStartTimestamp(data.show.time, data.lines, index))}</strong></td>
-                    <td class="col-duration">${formatScenarioLineDuration(line.duration)}</td>
-                    <td class="col-cue"><strong>${line.name || ''}</strong></td>
-                    <td class="col-note">${(line.note || '').trim().replaceAll('\n', '<br>')}</td>
-                    <td class="col-comments">${commentsHtml}</td>
-                </tr>
-            `;
-        }).join("");
-
-        return `
-            <section class="print-page-section">
-                <header class="print-header">
-                    <div class="print-header-main">
-                        <h1>${showTitle}</h1>
-                        <span class="print-badge">${titleSub}</span>
-                    </div>
-                    <div class="print-meta-grid">
-                        <div><strong>Date/Time:</strong> ${formattedDate}</div>
-                        <div><strong>Generated:</strong> ${new Date().toLocaleTimeString()}</div>
-                    </div>
-                </header>
-                <table class="print-table">
-                    <thead>
-                        <tr>
-                            <th class="col-time">Time</th>
-                            <th class="col-duration">Duration</th>
-                            <th class="col-cue">Cue</th>
-                            <th class="col-note">Note / Description</th>
-                            <th class="col-comments">Role Comments</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tableRowsHtml}
-                    </tbody>
-                </table>
-            </section>
-        `;
+    const commentCells = (cell: string, comments: ScenarioLineComment[]): ElementDefinition[] => {
+        if (comments.length === 0) return [{ type: "span", classes: "print-empty-text", text: "—", target: `@${cell}` }];
+        return sortCommentsByRole(comments, data.roles).flatMap((comment, index): ElementDefinition[] => {
+            const card = `${cell}_card${index}`;
+            return [
+                { type: "div", classes: "print-comment-card", varId: card, target: `@${cell}` },
+                { type: "span", classes: "print-comment-role", text: data.roles.find(r => r.id === comment.role_id)?.name || "General", target: `@${card}` },
+                { type: "div", classes: "print-comment-text", text: (comment.comment || "").trim(), target: `@${card}` }
+            ];
+        });
     };
 
-    let fullHtml = "";
+    const columns: [string, string][] = [
+        ["col-time", "Time"], ["col-duration", "Duration"], ["col-cue", "Cue"],
+        ["col-note", "Note / Description"], ["col-comments", "Role Comments"]
+    ];
+
+    // One printable page sheet; `page` keeps the varIds of several sheets apart.
+    const sheetSection = (page: number, titleSub: string, commentsList: ScenarioLineComment[]): ElementDefinition[] => {
+        const id = (name: string) => `${name}${page}`;
+        const rows = data.lines.flatMap((line, index): ElementDefinition[] => {
+            const row = id(`row${index}_`);
+            return [
+                { type: "tr", varId: row, target: `@${id("body")}` },
+                { type: "td", classes: "col-time", varId: `${row}time`, target: `@${row}` },
+                { type: "strong", text: formatScenarioLineTime(resolveScenarioLineStartTimestamp(data.show.time, data.lines, index)), target: `@${row}time` },
+                { type: "td", classes: "col-duration", text: formatScenarioLineDuration(line.duration), target: `@${row}` },
+                { type: "td", classes: "col-cue", varId: `${row}cue`, target: `@${row}` },
+                { type: "strong", text: line.name || "", target: `@${row}cue` },
+                { type: "td", classes: "col-note", text: (line.note || "").trim(), target: `@${row}` },
+                { type: "td", classes: "col-comments", varId: `${row}comments`, target: `@${row}` },
+                ...commentCells(`${row}comments`, commentsList.filter(c => c.line_id === line.id))
+            ];
+        });
+
+        const meta = (name: string, label: string, value: string): ElementDefinition[] => [
+            { type: "div", varId: id(name), target: `@${id("meta")}` },
+            { type: "strong", text: label, target: `@${id(name)}` },
+            { type: "span", text: ` ${value}`, target: `@${id(name)}` }
+        ];
+
+        return [
+            { type: "section", classes: "print-page-section", varId: id("section") },
+            { type: "header", classes: "print-header", varId: id("header"), target: `@${id("section")}` },
+            { type: "div", classes: "print-header-main", varId: id("headerMain"), target: `@${id("header")}` },
+            { type: "h1", text: showTitle, target: `@${id("headerMain")}` },
+            { type: "span", classes: "print-badge", text: titleSub, target: `@${id("headerMain")}` },
+            { type: "div", classes: "print-meta-grid", varId: id("meta"), target: `@${id("header")}` },
+            ...meta("date", "Date/Time:", formattedDate),
+            ...meta("generated", "Generated:", generatedAt),
+            { type: "table", classes: "print-table", varId: id("table"), target: `@${id("section")}` },
+            { type: "thead", varId: id("head"), target: `@${id("table")}` },
+            { type: "tr", varId: id("headRow"), target: `@${id("head")}` },
+            ...columns.map(([classes, text]): ElementDefinition => ({ type: "th", classes, text, target: `@${id("headRow")}` })),
+            { type: "tbody", varId: id("body"), target: `@${id("table")}` },
+            ...rows
+        ];
+    };
 
     if (options.printMode === "all_roles_separate") {
-        // Multi-page print: Includes Role Comments + General Comments for EVERY role sheet
-        data.roles.forEach(role => {
-            if (role.name.toLowerCase() === "general") return; // Skip standalone general page if iterating roles
-
-            const roleComments = data.comments.filter(c => c.role_id === role.id || isGeneralComment(c));
-            fullHtml += buildSheetSection(`Role: ${role.name}`, roleComments);
-        });
-    } else if (options.printMode === "single_role") {
-        const selectedRoleId = String(options.roleSelect);
-        const role = data.roles.find(r => r.id === selectedRoleId);
-        const roleName = role ? role.name : "Role";
-
-        // Includes Role Comments + General Comments
-        const roleComments = data.comments.filter(c => c.role_id === selectedRoleId || isGeneralComment(c));
-        fullHtml = buildSheetSection(`Role: ${roleName}`, roleComments);
-    } else if (options.printMode === "director") {
-        fullHtml = buildSheetSection("Master Run Sheet", data.comments);
-    } else {
-        fullHtml = buildSheetSection("Master Run Sheet", []);
+        // Multi-page print: Includes Role Comments + General Comments for EVERY role sheet.
+        // No standalone "general" page: its comments are on every role's sheet.
+        return data.roles
+            .filter(role => role.name.toLowerCase() !== "general")
+            .flatMap((role, page) => sheetSection(page, `Role: ${role.name}`, data.comments.filter(c => c.role_id === role.id || isGeneralComment(c))));
     }
+    if (options.printMode === "single_role") {
+        const selectedRoleId = String(options.roleSelect);
+        const roleName = data.roles.find(r => r.id === selectedRoleId)?.name ?? "Role";
+        // Includes Role Comments + General Comments
+        return sheetSection(0, `Role: ${roleName}`, data.comments.filter(c => c.role_id === selectedRoleId || isGeneralComment(c)));
+    }
+    return sheetSection(0, "Master Run Sheet", options.printMode === "director" ? data.comments : []);
+}
 
-    printContainer.innerHTML = fullHtml;
+function generateAndPrintSheet(data: ShowDetails, options: PromptData): void {
+    const printContainer = document.getElementById("print-container")
+        ?? dynamicGenerator({ type: "div", id: "print-container" }, document.body);
+    printContainer.replaceChildren();
+    generateDynamic(printSheetContent(data, options), printContainer);
 
     window.print();
     printContainer.remove();
 }
 
-export { openEditShow, buildEditShowLayout, generateAndPrintSheet, deleteLine };
+export { openEditShow, buildEditShowLayout, printSheetContent, generateAndPrintSheet, deleteLine };

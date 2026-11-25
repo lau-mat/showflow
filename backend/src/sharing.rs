@@ -25,7 +25,7 @@ const MAX_INVITE_USES: i32 = 100;
 pub(crate) fn routes() -> Router<AppState> {
     Router::new()
         .route("/shows/:id/members", get(list_members))
-        .route("/shows/:id/members/:user_id", patch(change_role).delete(remove_member))
+        .route("/shows/:id/members/:user_id", patch(change_member).delete(remove_member))
         .route("/shows/:id/invites", get(list_invites).post(create_invite))
         .route("/shows/:id/invites/:invite_id", delete(revoke_invite))
         .route("/invites/preview", post(preview_invite))
@@ -65,6 +65,8 @@ struct MemberView {
     user_id: Uuid,
     username: String,
     role: String,
+    /// May become show caller with their account (the owner always).
+    can_call: bool,
     is_me: bool,
 }
 
@@ -76,7 +78,7 @@ async fn list_members(
     let mut conn = state.pool.acquire().await?;
     member_role(&mut conn, show_id, me).await?.ok_or(ApiError::NotFound)?;
     let rows = sqlx::query(
-        "SELECT m.user_id, u.user_name, m.role FROM show_members m JOIN users u ON u.user_id = m.user_id
+        "SELECT m.user_id, u.user_name, m.role, (m.role = 'owner' OR m.can_call) AS can_call FROM show_members m JOIN users u ON u.user_id = m.user_id
          WHERE m.show_id = $1 ORDER BY (m.role = 'owner') DESC, u.user_name",
     )
     .bind(show_id)
@@ -86,31 +88,45 @@ async fn list_members(
         rows.into_iter()
             .map(|row| {
                 let user_id: Uuid = row.get("user_id");
-                MemberView { user_id, username: row.get("user_name"), role: row.get("role"), is_me: user_id == me }
+                MemberView {
+                    user_id,
+                    username: row.get("user_name"),
+                    role: row.get("role"),
+                    can_call: row.get("can_call"),
+                    is_me: user_id == me,
+                }
             })
             .collect(),
     ))
 }
 
 #[derive(Deserialize)]
-struct RoleChange {
-    role: String,
+struct MemberChange {
+    role: Option<String>,
+    can_call: Option<bool>,
 }
 
-async fn change_role(
+async fn change_member(
     State(state): State<AppState>,
     AuthenticatedUser(me): AuthenticatedUser,
     Path((show_id, user_id)): Path<(Uuid, Uuid)>,
-    Json(change): Json<RoleChange>,
+    Json(change): Json<MemberChange>,
 ) -> Result<StatusCode, ApiError> {
-    let role = grantable(&change.role)?;
+    let role = change.role.as_deref().map(grantable).transpose()?;
+    if role.is_none() && change.can_call.is_none() {
+        return Err(ApiError::BadRequest("Nothing to change".into()));
+    }
     let mut tx = state.pool.begin().await?;
     require_owner(&mut tx, show_id, me).await?;
-    // The owner's role is not changed through this endpoint.
-    let changed = sqlx::query("UPDATE show_members SET role = $3 WHERE show_id = $1 AND user_id = $2 AND role <> 'owner'")
+    // The owner's role is not changed through this endpoint (and the owner may always call).
+    let changed = sqlx::query(
+        "UPDATE show_members SET role = COALESCE($3, role), can_call = COALESCE($4, can_call)
+         WHERE show_id = $1 AND user_id = $2 AND role <> 'owner'",
+    )
         .bind(show_id)
         .bind(user_id)
-        .bind(role.as_str())
+        .bind(role.map(MemberRole::as_str))
+        .bind(change.can_call)
         .execute(&mut *tx)
         .await?
         .rows_affected();

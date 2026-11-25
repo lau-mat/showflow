@@ -2,12 +2,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { addHoverBox, dynamicGenerator, generateDynamic } from "/shared/js/dynamic_generator";
 import { detectPlatform } from "/shared/js/platform";
-import { SessionSocket } from "/shared/js/session_socket";
-import type { SessionState } from "/shared/js/session_types";
+import type { CallerInfo, SessionState } from "/shared/js/session_types";
 import { compareLines, sortCommentsByRole, type ScenarioLine, type ShowDetails } from "/shared/js/show_types";
+import { AccessFlow, openSessionSocket, pageNotice, showNotice } from "./claim";
 import { startTimers } from "./timers";
 
-const ws = new SessionSocket();
+const ws = await openSessionSocket();
+// Set in the host computer's own caller window.
+const hostContext = window.__SHOWFLOW_SESSION__;
 
 let showData: ShowDetails | null = null;
 let sessionData: SessionState | null = null;
@@ -20,14 +22,58 @@ function requireElement(id: string): HTMLElement {
 
 const elemShowName = requireElement("ShowName");
 const elemItemCounter = requireElement("itemCounter");
-const btnNextCue = requireElement("btnNextCue");
-const btnPreviousCue = requireElement("previousCue");
+const btnNextCue = requireElement("btnNextCue") as HTMLButtonElement;
+const btnPreviousCue = requireElement("previousCue") as HTMLButtonElement;
+const btnRelease = requireElement("releaseCaller") as HTMLButtonElement;
 
-// Sharing (QR) and window fullscreen only exist where the platform provides them.
-const profile = await detectPlatform();
+/** The buttons only work once the server has made this device a caller. */
+function setControlsEnabled(enabled: boolean): void {
+    btnNextCue.disabled = !enabled;
+    btnPreviousCue.disabled = !enabled;
+}
+setControlsEnabled(false);
+// The host's own window cannot give up the role: it is how the host calls.
+btnRelease.hidden = Boolean(hostContext?.isHost);
 
-function addActionButtons(): void {
-    if (profile.features.qrShare) {
+export const callerFlow = new AccessFlow({
+    kind: "call",
+    send: claim => ws.emit("claim_caller", { claim }),
+    onGranted: () => setControlsEnabled(true),
+    onLost: reason => {
+        setControlsEnabled(false);
+        // Back to the join screen, which offers "Become show caller" again.
+        pageNotice.set(reason ?? "You are no longer a show caller.");
+        window.location.replace(`client.html${window.location.search}`);
+    },
+    notify: text => showNotice(text)
+});
+
+ws.on("welcome", message => {
+    callerFlow.welcome(message);
+    if (hostContext?.isHost) {
+        void invoke<string>("caller_host_token", { sessionId: hostContext.sessionId })
+            .then(token => callerFlow.claim({ method: "host", token }));
+        return;
+    }
+    // Anyone else gets here by becoming caller on the join screen, which stored a token.
+    if (!callerFlow.resume()) {
+        pageNotice.set("Choose \"Become show caller\" to open the caller view.");
+        window.location.replace(`client.html${window.location.search}`);
+    }
+});
+ws.on("policy", rules => callerFlow.adopt(rules));
+ws.on("caller_status", status => callerFlow.handle(status));
+ws.on("callers", ({ list }) => renderCallers(list));
+
+function renderCallers(list: CallerInfo[]): void {
+    requireElement("callerList").textContent = list.length ? list.map(caller => caller.name).join(", ") : "—";
+}
+
+// Sharing (QR) and window fullscreen only exist where the platform provides them. (Nothing here
+// may await before every message handler is registered: the host sends the show right away.)
+async function addActionButtons(): Promise<void> {
+    const profile = await detectPlatform();
+    if (profile.features.qrShare && hostContext?.isHost) {
         dynamicGenerator({ type: "svg", file: "icons/share.svg", events: { click: share }, classes: ["btn", "icon-btn"], style: { width: "24px", height: "24px" } }, "#actionBtnContainer");
     }
     if (profile.features.fullscreenWindow) {
@@ -37,17 +83,19 @@ function addActionButtons(): void {
 
 // Module scripts are deferred, so the DOM may already be parsed by now.
 if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", addActionButtons);
+    document.addEventListener("DOMContentLoaded", () => { void addActionButtons(); });
 } else {
-    addActionButtons();
+    void addActionButtons();
 }
 
 ws.on("error", data => {
     throw new Error(`Backend error: ${data.message}`);
 });
 
-ws.on("cue_change", ({ current_cue, next_cue, show_started_at, cue_started_at }) => {
+ws.on("cue_change", ({ current_cue, next_cue, show_started_at, cue_started_at, by }) => {
     if (!showData) return;
+    // With several callers it matters who moved the show.
+    if (by) requireElement("cueChangedBy").textContent = `by ${by}`;
     if (sessionData) {
         sessionData.current_cue = current_cue;
         sessionData.show_started_at = show_started_at;
@@ -58,7 +106,7 @@ ws.on("cue_change", ({ current_cue, next_cue, show_started_at, cue_started_at })
     // Reset all cards
     document.querySelectorAll(".cue-card").forEach(el => {
         el.classList.remove("active", "next");
-        const badge = el.querySelector("span:last-child");
+        const badge = el.querySelector(".cue-status");
         if (badge) badge.textContent = "pending";
     });
 
@@ -69,7 +117,7 @@ ws.on("cue_change", ({ current_cue, next_cue, show_started_at, cue_started_at })
     const activeCard = activeId != null ? document.querySelector(`.cue-card[data-line-id="${activeId}"]`) : null;
     if (activeCard) {
         activeCard.classList.add("active");
-        const badge = activeCard.querySelector("span:last-child");
+        const badge = activeCard.querySelector(".cue-status");
         if (badge) badge.textContent = "LIVE";
         activeCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
@@ -87,7 +135,7 @@ async function toggleFullscreen(): Promise<void> {
 
 async function share(): Promise<void> {
     try {
-        const qrSvg = await invoke<string>("generate_server_qr");
+        const qrSvg = await invoke<string>("session_qr", { sessionId: hostContext?.sessionId });
 
         addHoverBox(
             null,
@@ -125,7 +173,7 @@ ws.on("get_show_data", data => {
             { type: "div", classes: "cue-info", target: "@wrapper", varId: "infoSection" },
             { type: "span", classes: "cue-title", text: `Cue ${index + 1}: ${line.name}`, target: "@infoSection" },
             { type: "span", classes: "cue-time", text: `Duration: ${line.duration}s`, target: "@infoSection" },
-            { type: "span", text: "pending", style: { color: "var(--text-muted)", fontSize: "0.8rem" }, target: "@wrapper" }
+            { type: "span", classes: "cue-status", text: "pending", style: { color: "var(--text-muted)", fontSize: "0.8rem" }, target: "@wrapper" }
         ], "#cueList");
     });
 
@@ -147,7 +195,7 @@ ws.on("get_session_data", data => {
 });
 
 ws.on("join_session", ({ command: _command, ...user }) => {
-    sessionData?.joined_users.push(user);
+    sessionData?.joined_users.push({ ...user, is_caller: false });
     addUserToElem(user.client_role, user.client_name);
 });
 
@@ -214,8 +262,10 @@ function renderCueNoteCard(kind: "active" | "next", line: ScenarioLine | null): 
     }
 }
 
-btnNextCue.addEventListener("click", () => ws.emit("next_cue"));
-btnPreviousCue.addEventListener("click", () => ws.emit("previous_cue"));
+// Saying which cue we saw lets the server ignore a press another caller already made.
+btnNextCue.addEventListener("click", () => ws.emit("next_cue", { from_cue: sessionData?.current_cue ?? null }));
+btnPreviousCue.addEventListener("click", () => ws.emit("previous_cue", { from_cue: sessionData?.current_cue ?? null }));
+btnRelease.addEventListener("click", () => ws.emit("release_caller"));
 
 function jumpToCue(cueNumber: number): void {
     ws.emit("jump_to_cue", { cue_number: cueNumber });

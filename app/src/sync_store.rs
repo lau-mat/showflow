@@ -153,6 +153,9 @@ pub fn forget_show(conn: &mut Connection, show_id: &str) -> Result<(), String> {
     tx.execute("DELETE FROM shows WHERE show_id = ?1", [show_id]).map_err(err)?;
     tx.execute("DELETE FROM outbox WHERE show_id = ?1", [show_id]).map_err(err)?;
     tx.execute("DELETE FROM sync_shows WHERE show_id = ?1", [show_id]).map_err(err)?;
+    tx.execute("DELETE FROM session_settings WHERE show_id = ?1", [show_id]).map_err(err)?;
+    tx.execute("DELETE FROM caller_passes WHERE show_id = ?1", [show_id]).map_err(err)?;
+    tx.execute("DELETE FROM caller_lists WHERE show_id = ?1", [show_id]).map_err(err)?;
     tx.commit().map_err(err)
 }
 

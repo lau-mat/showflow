@@ -10,7 +10,8 @@ export class FakeWebSocket {
 export function installFakeBrowser() {
     const storage = new Map();
     const elements = new Map();
-    const ids = ["ShowName", "itemCounter", "btnNextCue", "previousCue"];
+    const ids = ["ShowName", "itemCounter", "btnNextCue", "previousCue", "releaseCaller", "cueChangedBy", "callerList"];
+    const navigations = [];
     const fakeElement = id => elements.get(id) ?? elements.set(id, {
         id, innerText: "", textContent: "", listeners: {},
         addEventListener(type, listener) { this.listeners[type] = listener; },
@@ -19,8 +20,19 @@ export function installFakeBrowser() {
 
     globalThis.WebSocket = FakeWebSocket;
     globalThis.window = {
-        location: { hostname: "192.168.1.20" },
-        localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) }
+        location: {
+            hostname: "192.168.1.20",
+            // The socket port is given explicitly, so no /session-info request is needed.
+            search: "?ws=47123",
+            assign: url => navigations.push(["assign", url]),
+            replace: url => navigations.push(["replace", url]),
+            reload: () => navigations.push(["reload"])
+        },
+        localStorage: {
+            getItem: key => storage.get(key) ?? null,
+            setItem: (key, value) => storage.set(key, value),
+            removeItem: key => storage.delete(key)
+        }
     };
     globalThis.document = {
         readyState: "complete",
@@ -33,8 +45,8 @@ export function installFakeBrowser() {
     globalThis.clearInterval = () => {};
     globalThis.__currentWindow = undefined;
     globalThis.__generateDynamic = () => ({});
-    globalThis.__dynamicGenerator = () => ({ replaceChildren() {} });
-    return { storage, fakeElement };
+    globalThis.__dynamicGenerator = () => ({ replaceChildren() {}, remove() {} });
+    return { storage, fakeElement, navigations };
 }
 
 export const show = {

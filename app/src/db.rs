@@ -209,6 +209,35 @@ fn get_migrations() -> Migrations<'static> {
                 created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
             );
             ALTER TABLE auth_state ADD COLUMN user_id TEXT;"
+        ),
+        M::up(
+            "-- Who may call each show in a live session, remembered between sessions.
+            CREATE TABLE session_settings (
+                show_id TEXT PRIMARY KEY,
+                policy TEXT NOT NULL,
+                code TEXT
+            );"
+        ),
+        M::up(
+            "-- Account-based caller access (see caller_store.rs). This device's secret key and the
+            -- passes issued to it; and, for hosting, the cloud's public key and each show's callers.
+            CREATE TABLE caller_device (id INTEGER PRIMARY KEY CHECK (id = 1), seed TEXT NOT NULL);
+            CREATE TABLE caller_passes (
+                show_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                pass TEXT NOT NULL,
+                expires_at INTEGER NOT NULL,
+                PRIMARY KEY (show_id, user_id)
+            );
+            CREATE TABLE caller_trust (id INTEGER PRIMARY KEY CHECK (id = 1), public_key TEXT NOT NULL);
+            CREATE TABLE caller_lists (show_id TEXT PRIMARY KEY, callers TEXT NOT NULL);"
+        ),
+        M::up(
+            "-- Joining a session can be protected like calling it: its own policy and code (unset:
+            -- open). Hosts also keep each show's members, who may join by account.
+            ALTER TABLE session_settings ADD COLUMN view_policy TEXT;
+            ALTER TABLE session_settings ADD COLUMN view_code TEXT;
+            ALTER TABLE caller_lists ADD COLUMN members TEXT NOT NULL DEFAULT '[]';"
         )
     ])
 }

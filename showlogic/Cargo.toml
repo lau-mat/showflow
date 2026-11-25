@@ -1,0 +1,11 @@
+[package]
+name = "showlogic"
+version = "0.1.0"
+edition = "2021"
+
+# The engine that runs a live show, free of sockets, windows and databases, so it can run inside
+# the desktop app today and in a cloud container later.
+[dependencies]
+protocol = { path = "../protocol" }
+serde = { version = "1", features = ["derive"] }
+uuid = { version = "1", features = ["v4"] }

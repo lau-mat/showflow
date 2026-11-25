@@ -9,7 +9,7 @@ const editShow = await import("../frontend/main/js/pages/edit_show.page.ts");
 installPlatform(buildProfile("desktop", "linux"));
 
 // client.ts opens its websocket and registers listeners on import.
-globalThis.window = { location: { hostname: "localhost" } };
+globalThis.window = { location: { hostname: "localhost", search: "?ws=47100" } };
 globalThis.WebSocket = class {};
 globalThis.document = { addEventListener() {} };
 const client = await import("../frontend/session/js/client.ts");
@@ -50,9 +50,11 @@ test("times roll over midnight and accept numeric strings and epoch-zero anchors
 });
 
 test("editor and all print layouts display the same resolved start times", () => {
-    const printContainer = { innerHTML: "", remove() {} };
+    let printed = [];
+    const printContainer = { replaceChildren() {}, remove() {} };
     globalThis.window = { print() {} };
     globalThis.document = { getElementById: () => printContainer };
+    globalThis.__generateDynamic = (definitions, target) => { assert.equal(target, printContainer); printed = definitions; return {}; };
 
     const cells = editShow.buildEditShowLayout(data)
         .filter(item => item.classes === "line-number-cell");
@@ -60,11 +62,35 @@ test("editor and all print layouts display the same resolved start times", () =>
 
     for (const printMode of ["director", "single_role", "all_roles_separate"]) {
         editShow.generateAndPrintSheet(data, { printMode, roleSelect: "role-1" });
-        const times = [...printContainer.innerHTML.matchAll(
-            /class="col-time"><strong>(.*?)<\/strong>/g
-        )].map(match => match[1]);
+        const timeCells = printed.filter(item => item.type === "td" && item.classes === "col-time");
+        const times = timeCells.map(cell => printed.find(item => item.target === `@${cell.varId}`).text);
         assert.deepEqual(times, expected);
     }
+});
+
+test("nothing written by a collaborator reaches the print sheet as markup", () => {
+    const evil = name => `<img src=x onerror="steal('${name}')">`;
+    const hostile = {
+        show: { name: evil("title"), time: showStart },
+        roles: [{ id: "r1", name: evil("role") }, { id: "r2", name: "Sound" }],
+        lines: [{ id: "l1", position: "a", name: evil("cue"), note: `first\n${evil("note")}`, duration: 5, absolute_time: null }],
+        comments: [{ id: "c1", line_id: "l1", role_id: "r1", comment: evil("comment") }]
+    };
+    for (const printMode of ["director", "single_role", "all_roles_separate", "simple"]) {
+        const sheet = editShow.printSheetContent(hostile, { printMode, roleSelect: "r1" });
+        assert.ok(sheet.every(item => item.html === undefined && item.sketch === undefined && item.children === undefined), printMode);
+        // It is all still there, as the literal characters typed (newlines included).
+        const texts = sheet.map(item => item.text);
+        assert.ok(texts.includes(evil("title")) && texts.includes(evil("cue")) && texts.includes(`first\n${evil("note")}`), printMode);
+        // Several sheets must not share a parent id, or rows would land on the wrong page.
+        const ids = sheet.flatMap(item => (item.varId ? [item.varId] : []));
+        assert.equal(new Set(ids).size, ids.length, printMode);
+        assert.ok(sheet.every(item => !item.target || ids.includes(item.target.slice(1))), printMode);
+    }
+    const director = editShow.printSheetContent(hostile, { printMode: "director" }).map(item => item.text);
+    assert.ok(director.includes(evil("comment")) && director.includes(evil("role")));
+    const separate = editShow.printSheetContent(hostile, { printMode: "all_roles_separate" });
+    assert.equal(separate.filter(item => item.type === "section").length, 2);
 });
 
 test("client display and countdown share resolved start times", () => {

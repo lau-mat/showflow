@@ -1,10 +1,10 @@
 import { dynamicGenerator, dynamicPrompt, generateDynamic, type ElementDefinition } from "/shared/js/dynamic_generator";
 import { formatScenarioLineTime, resolveScenarioLineStartTimestamp } from "/shared/js/scenario_time";
-import { SessionSocket } from "/shared/js/session_socket";
 import type { SessionClient, SessionState } from "/shared/js/session_types";
+import { AccessFlow, gateStatus, hideGate, openSessionSocket, pageNotice, showGate, showNotice } from "./claim";
 import { compareLines, type ScenarioLine, type ShowDetails } from "/shared/js/show_types";
 
-const ws = new SessionSocket();
+const ws = await openSessionSocket();
 
 let loginSend = false;
 
@@ -58,8 +58,68 @@ ws.on("get_session_data", data => {
     if (session.showContent) selectRole();
 });
 
+/** Getting into a protected session. Until then the host sends nothing about the show. */
+export const viewFlow = new AccessFlow({
+    kind: "view",
+    send: claim => ws.emit("request_view", { claim }),
+    onGranted: hideGate,
+    onLost: reason => {
+        if (!session.showContent) {
+            // Never got in (a stored token that no longer works): ask again.
+            showGate(askToJoin);
+            if (reason) gateStatus(reason);
+            return;
+        }
+        // Put out: a fresh page is the sure way to have nothing of the show left on screen.
+        pageNotice.set(reason ?? "You are no longer in this session.");
+        window.location.reload();
+    },
+    notify: gateStatus
+});
+
+function askToJoin(): void {
+    void viewFlow.request("");
+}
+
+/** Becoming caller moves this device to the caller view; the stored token brings it in. */
+export const callerFlow = new AccessFlow({
+    kind: "call",
+    send: claim => ws.emit("claim_caller", { claim }),
+    onGranted: () => window.location.assign(`session.html${window.location.search}`),
+    onLost: reason => { if (reason) showNotice(reason); },
+    notify: text => showNotice(text)
+});
+
+ws.on("welcome", message => {
+    viewFlow.welcome(message);
+    callerFlow.welcome(message);
+    const notice = pageNotice.take();
+    if (message.view_policy.open) {
+        if (notice) showNotice(notice);
+        return;
+    }
+    showGate(askToJoin);
+    if (notice) gateStatus(notice);
+    // Come straight back in if this device was in before; otherwise ask, unless it was just
+    // put out and should first read why.
+    if (!viewFlow.resume() && !notice) askToJoin();
+});
+ws.on("policy", rules => {
+    viewFlow.adopt(rules);
+    callerFlow.adopt(rules);
+});
+ws.on("view_status", status => viewFlow.handle(status));
+ws.on("caller_status", status => callerFlow.handle(status));
+
+function becomeCallerButton(classes: string[], name: () => string): ElementDefinition {
+    return {
+        type: "button", classes, text: "Become show caller", attributes: { type: "button" },
+        events: { click: () => { void callerFlow.request(name()); } }
+    };
+}
+
 ws.on("join_session", ({ command: _command, ...user }) => {
-    session.sessionData?.joined_users.push(user);
+    session.sessionData?.joined_users.push({ ...user, is_caller: false });
 
     if (!loginSend) return;
     if (user.client_name !== session.userName || user.client_role !== session.roleId) return;
@@ -101,7 +161,9 @@ async function selectRole(): Promise<void> {
             required: true,
             elements: [
                 { type: "input-label", label: "Name", id: "userName" },
-                { type: "select-label", label: "Role", id: "roleId", options: roleOptions }
+                { type: "select-label", label: "Role", id: "roleId", options: roleOptions },
+                // Calling needs a name but no crew role, so it is offered next to joining.
+                becomeCallerButton(["chip", "become-caller"], () => (document.getElementById("userName") as HTMLInputElement | null)?.value.trim() ?? "")
             ]
         });
         if (!joined) return;
@@ -163,14 +225,14 @@ function noteNodes(lineId: string, small = false): ElementDefinition[] {
         type: "div", classes: ["ch-note", "ch-note-general", ...smClass],
         children: [
             { type: "span", classes: "ch-note-label", text: "GENERAL" },
-            { type: "p", classes: "ch-note-body", html: general.replace(/\n/g, "<br>") }
+            { type: "p", classes: "ch-note-body", text: general }
         ]
     });
     if (personal) nodes.push({
         type: "div", classes: ["ch-note", "ch-note-personal", ...smClass],
         children: [
             { type: "span", classes: "ch-note-label", text: "MY NOTE" },
-            { type: "p", classes: "ch-note-body", html: personal.replace(/\n/g, "<br>") }
+            { type: "p", classes: "ch-note-body", text: personal }
         ]
     });
     return nodes;
@@ -312,6 +374,7 @@ function buildStructure(): void {
         { type: "span", classes: "ch-show-name", text: showContent().show.name, target: "@meta" },
         { type: "span", classes: "ch-live-badge", text: "LIVE", target: "@meta" },
         { type: "span", classes: "ch-cue-counter", id: "chCueCounter", text: "— / —", target: "@meta" },
+        { ...becomeCallerButton(["chip", "ch-become-caller"], () => session.userName ?? ""), target: "@hdr" },
         { type: "span", classes: "ch-clock", id: "chClock", target: "@hdr" },
 
         { type: "main", classes: "ch-body", varId: "body" },

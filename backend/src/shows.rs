@@ -134,6 +134,10 @@ struct ShowListItem {
     #[serde(flatten)]
     show: Show,
     rev: i64,
+    /// Everyone with access, and those who may call it in a live session. A session host keeps
+    /// both to decide offline what the holder of a pass may do.
+    members: Vec<Uuid>,
+    callers: Vec<Uuid>,
 }
 
 async fn list_shows(
@@ -141,7 +145,10 @@ async fn list_shows(
     AuthenticatedUser(user_id): AuthenticatedUser,
 ) -> Result<Json<Vec<ShowListItem>>, ApiError> {
     let rows = sqlx::query(
-        "SELECT s.show_id, s.name, s.show_time, s.rev, m.role
+        "SELECT s.show_id, s.name, s.show_time, s.rev, m.role,
+                ARRAY(SELECT a.user_id FROM show_members a WHERE a.show_id = s.show_id ORDER BY a.user_id) AS members,
+                ARRAY(SELECT c.user_id FROM show_members c
+                      WHERE c.show_id = s.show_id AND (c.role = 'owner' OR c.can_call) ORDER BY c.user_id) AS callers
          FROM shows s JOIN show_members m ON m.show_id = s.show_id
          WHERE m.user_id = $1 AND s.deleted_at IS NULL
          ORDER BY s.show_time, s.show_id",
@@ -161,6 +168,8 @@ async fn list_shows(
                     role: MemberRole::parse(&role).unwrap_or(MemberRole::Viewer),
                 },
                 rev: row.get("rev"),
+                members: row.get("members"),
+                callers: row.get("callers"),
             }
         })
         .collect();

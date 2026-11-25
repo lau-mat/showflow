@@ -364,6 +364,56 @@
   color: var(--text-main, #f4f4f6);
 }
 
+/* A chip that is an on/off switch. */
+.chip.is-on {
+  border-color: var(--accent-color, #f59e0b);
+  color: var(--accent-color, #f59e0b);
+}
+
+/* The line under an access dropdown saying what the choice means. */
+.access-field { margin-top: 0.4rem; }
+.access-hint { margin: 0.25rem 0 0.4rem; font-size: 0.75rem; color: var(--text-muted, #93939e); }
+.modal-error-message:empty { display: none; }
+
+/* A protected session before this device is let in. */
+.view-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top, 0px)) 1rem max(1rem, env(safe-area-inset-bottom, 0px));
+  background-color: var(--bg-color, #19191c);
+}
+
+.view-gate-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(100%, 22rem);
+  padding: 1.25rem;
+  text-align: center;
+  background-color: var(--surface-color, #222226);
+  color: var(--text-main, #f4f4f6);
+  border: 1px solid var(--border-color, #2e2e35);
+  border-radius: var(--radius, 10px);
+}
+
+.view-gate-card h1 { font-size: 1.05rem; }
+.view-gate-card p { font-size: 0.85rem; color: var(--text-muted, #93939e); }
+
+.view-gate-card .btn {
+  min-height: 2.75rem;
+  background-color: var(--header-bg, #27272d);
+  color: var(--accent-color, #f59e0b);
+  border: 1px solid var(--accent-color, #f59e0b);
+  border-radius: 6px;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* Calendar */
 .cal { display: flex; flex-direction: column; gap: 0.35rem; }
 
@@ -513,6 +563,7 @@ button, select, .chip, .choice-btn, .cal-day, .seg-btn, .cal-nav {
 @media (hover: none) {
   .cal-day:hover { background-color: transparent; }
   .chip:hover { border-color: var(--border-color, #2e2e35); color: var(--text-muted, #93939e); }
+  .chip.is-on:hover { border-color: var(--accent-color, #f59e0b); color: var(--accent-color, #f59e0b); }
   .seg-btn:hover, .cal-nav:hover { background-color: transparent; color: var(--text-muted, #93939e); }
   .choice-btn:hover { color: var(--text-muted, #93939e); }
   .choice-btn.is-active:hover { color: var(--accent-color, #f59e0b); }
@@ -552,4 +603,46 @@ button, select, .chip, .choice-btn, .cal-day, .seg-btn, .cal-nav {
 @media (max-width: 360px) {
   .modal-content .seg-input { width: 3rem; font-size: 1.35rem; }
   .seg-btn { width: 3rem; }
+}
+
+/* A short message at the top of a session page ("Wrong code", "Connection lost"). */
+.session-notice {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3000; /* above any dialog */
+  width: max-content;
+  max-width: calc(100vw - 1.5rem);
+  padding: 0.55rem 0.9rem;
+  background-color: var(--header-bg, #27272d);
+  color: var(--text-main, #f4f4f6);
+  border: 1px solid var(--accent-color, #f59e0b);
+  border-radius: calc(var(--radius, 10px) - 2px);
+  box-shadow: var(--modal-shadow, 0 10px 30px rgba(0, 0, 0, 0.5));
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.modal-content .become-caller { align-self: flex-start; margin-top: 0.9rem; }
+.modal-content .show-code { align-self: flex-start; margin-top: 0.35rem; }
+.ch-become-caller { margin-left: auto; margin-right: 0.75rem; }
+
+/* Back to the show list, on session pages the app opened for a session elsewhere. */
+.app-back {
+  position: fixed;
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  left: max(0.75rem, env(safe-area-inset-left, 0px));
+  z-index: 3000;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0 0.9rem;
+  background-color: var(--surface-color, #222226);
+  color: var(--text-main, #f4f4f6);
+  border: 1px solid var(--border-color, #2e2e35);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-decoration: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }

@@ -4,21 +4,40 @@ import { hasFeature } from "/shared/js/platform";
 import type { Show } from "/shared/js/show_types";
 import { getApi } from "../api";
 import { openEditShow } from "./edit_show.page";
+import { renderDiscovery } from "./join_session";
+import { openSessionPanel, startShowSession } from "./session_panel";
 
-/** Table of sessions found on the network (join targets). */
-export function renderSessionDiscovery(): void {
-    generateDynamic([
-        { type: "div", id: "sessionDiscovery" },
-        { type: "table", target: "#sessionDiscovery", id: "discoveredSessions" },
-        { type: "thead", target: "#discoveredSessions", varId: "discoveredSessionsTableHead" },
-        { type: "tr", target: "@discoveredSessionsTableHead", varId: "discoveryHeaderRow" },
-        { type: "th", target: "@discoveryHeaderRow", text: "Session Name" },
-        { type: "th", target: "@discoveryHeaderRow", text: "Session ID" },
-        { type: "th", target: "@discoveryHeaderRow", text: "Actions" },
-        { type: "tbody", target: "#discoveredSessions", id: "discoveredSessionsTableBody" },
-        { type: "tr", target: "#discoveredSessionsTableBody", varId: "noSessionsRow" },
-        { type: "td", target: "@noSessionsRow", text: "No sessions discovered yet.", attributes: { colspan: "3" } }
-    ], "#mainSection");
+/** show id -> id of its running session on this computer. */
+const runningSessions = new Map<string, string>();
+
+/** Lights up the start icon of every show that has a running session. */
+async function markRunningSessions(): Promise<void> {
+    const { host } = getApi();
+    if (!host) return;
+    const sessions = await host.listSessions();
+    runningSessions.clear();
+    for (const session of sessions) runningSessions.set(session.show_id, session.session_id);
+    document.querySelectorAll<HTMLElement>("#editShowsTableBody tr[data-show-id]").forEach(row => {
+        row.querySelector(".start-session")?.classList.toggle("session-active", runningSessions.has(row.dataset.showId ?? ""));
+    });
+}
+
+/** Shows whose start button is being handled: a double click must not start twice. */
+const starting = new Set<string>();
+
+/** Starts a session for the show, or opens the panel of the one already running. */
+async function startOrManageSession(show: Show): Promise<void> {
+    if (starting.has(show.id)) return;
+    starting.add(show.id);
+    try {
+        await markRunningSessions();
+        const sessionId = runningSessions.get(show.id) ?? await startShowSession(show);
+        if (!sessionId) return;
+        await markRunningSessions();
+        await openSessionPanel(sessionId);
+    } finally {
+        starting.delete(show.id);
+    }
 }
 
 function addShowItem(show: Show): void {
@@ -34,7 +53,7 @@ function addShowItem(show: Show): void {
         { type: "div", classes: "actions-cell", target: "@actionContainer", varId: "actionCell" },
         { type: "svg", file: "icons/edit.svg", classes: ["btn-icon", "btn-muted"], target: "@actionCell", varId: "editBtn" },
         ...(canHost
-            ? [{ type: "svg", file: "icons/start.svg", classes: ["btn-icon", "btn-muted"], target: "@actionCell", varId: "startSession" }]
+            ? [{ type: "svg", file: "icons/start.svg", classes: ["btn-icon", "btn-muted", "start-session", ...(runningSessions.has(show.id) ? ["session-active"] : [])], attributes: { title: "Session" }, target: "@actionCell", varId: "startSession" }]
             : []),
         { type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-danger"], attributes: { title: show.role === "owner" ? "Delete this show" : "Leave this show" }, target: "@actionCell", varId: "delBtn" }
     ], "#editShowsTableBody");
@@ -52,10 +71,7 @@ function addShowItem(show: Show): void {
     });
     item.editBtn.addEventListener("click", () => openEditShow(show.id));
     if (canHost) {
-        item.startSession.addEventListener("click", async () => {
-            await host.startSession(show.id);
-            item.startSession.classList.add("session-active");
-        });
+        item.startSession.addEventListener("click", () => { void startOrManageSession(show); });
     }
 }
 
@@ -83,7 +99,7 @@ async function createShow(): Promise<void> {
 export async function loadHomePage(): Promise<void> {
     const { data, host } = getApi();
 
-    if (hasFeature("sessionDiscovery")) renderSessionDiscovery();
+    if (hasFeature("sessionDiscovery")) renderDiscovery();
 
     generateDynamic([
         { type: "div", id: "editShows" },
@@ -119,8 +135,12 @@ export async function loadHomePage(): Promise<void> {
         shows.forEach(addShowItem);
     });
 
-    // Clear the "running" marker when the session window is closed.
-    await host?.onSessionStopped(() => {
-        document.querySelector("svg.btn-icon.session-active")?.classList.remove("session-active");
-    });
+    // Keep the "running" markers right as sessions start and end.
+    if (host && hasFeature("sessionHost")) {
+        await markRunningSessions();
+        const stop = await host.onSessionUpdated(() => {
+            if (!document.getElementById("editShowsTableBody")) return stop(); // the user left this page
+            void markRunningSessions();
+        });
+    }
 }

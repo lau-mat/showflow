@@ -166,6 +166,43 @@ DATABASE_URL='postgres://USER:PASSWORD@localhost:5432/postgres' \
   cargo test -p showflow-backend -- --ignored
 ```
 
+## Live sessions and show callers
+
+The start button starts a session at once and opens its panel, with one join
+address and QR code. Who gets in is set per show with the settings button in the
+show editor (and can be changed in the panel while running):
+
+| Setting | Default | Choices |
+| --- | --- | --- |
+| Who can join | Open to everyone | open, on approval, with a code, by account, only this computer |
+| Who can become show caller | On approval | the same |
+
+Until a device is let in, the host sends it nothing about the show. The join code
+and the caller code are separate. All callers control the show. The host can call
+from the same computer, remove callers and (in a protected session) devices, and
+is the only one who can end the session.
+
+Other ShowFlow apps list the sessions on the network by themselves. If a network
+blocks that, **Join by address** takes the address from the panel. Allow these on
+the host's firewall:
+
+- UDP 47099, for being found;
+- TCP 47100-47199, for the sessions (two random ports each, so one computer can
+  run several shows; override with `SHOWFLOW_SESSION_PORTS=<from>-<to>`).
+
+Show names are visible to others on the network, also for protected sessions.
+The venue network link is plain HTTP and WebSocket: anyone who can capture its
+traffic can read codes. Use a trusted network for a live show.
+
+**Account access** needs `CALLER_PASS_KEY` on the backend: 32 random bytes in
+base64, from `openssl rand -base64 32`. Keep it with the other secrets and do not
+change it casually. Joining by account admits anyone with access to the show;
+calling by account admits the owner and the people marked **Show caller** under
+Share. Their app, and the hosting app, each have to sync with the cloud once;
+after that it works without internet. Passes last 14 days and are renewed while
+online. A removed person is refused once the host has synced, or when the pass
+expires.
+
 ## Run sheet times
 
 The editor, printed run sheets, and client cue displays show each item's absolute

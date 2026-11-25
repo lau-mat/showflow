@@ -55,10 +55,22 @@ function shareContent(showId: string, myRole: MemberRole, state: ShareState, box
             canChange
                 ? { type: "select", varId: `${row}_role`, classes: "role-select", target: `@${row}`,
                     events: { change: (event: Event) => { void attempt(() => share.setRole(showId, member.user_id, (event.target as HTMLSelectElement).value))(); } } }
-                : { type: "span", classes: "device-seen", text: ROLE_LABELS[member.role] ?? member.role, target: `@${row}` },
+                : {
+                    type: "span", classes: "device-seen", target: `@${row}`,
+                    text: `${ROLE_LABELS[member.role] ?? member.role}${member.can_call && member.role !== "owner" ? " · show caller" : ""}`
+                },
             ...(canChange ? GRANTABLE.map(role => ({
                 type: "option", text: ROLE_LABELS[role], attributes: { value: role, ...(member.role === role ? { selected: "selected" } : {}) }, target: `@${row}_role`
             })) : []),
+            ...(canChange ? [{
+                type: "button", classes: member.can_call ? ["chip", "caller-toggle", "is-on"] : ["chip", "caller-toggle"], text: "Show caller",
+                attributes: {
+                    type: "button", "aria-pressed": String(member.can_call),
+                    title: member.can_call ? "May call the show in a live session with their account. Press to take that away." : "Let them call the show in a live session with their account"
+                },
+                events: { click: attempt(() => share.setCaller(showId, member.user_id, !member.can_call)) },
+                target: `@${row}`
+            }] : []),
             ...((canChange || (member.is_me && member.role !== "owner")) ? [{
                 type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-danger"],
                 attributes: { title: member.is_me ? "Leave this show" : "Remove from this show" },

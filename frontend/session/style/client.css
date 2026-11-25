@@ -487,3 +487,19 @@ html, body {
   .ch-clock        { font-size: 1rem; }
   .ch-note-body    { font-size: 0.95rem; }
 }
+/* Dialog buttons (join, become caller): this page has no other button styles. */
+.modal-footer .btn {
+  padding: 0.5rem 1rem;
+  background-color: var(--header-bg);
+  border: 1px solid var(--border-color);
+  border-radius: calc(var(--radius) - 4px);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.modal-footer .btn-primary {
+  background-color: var(--btn-primary-glow);
+  border-color: var(--btn-primary-border);
+}

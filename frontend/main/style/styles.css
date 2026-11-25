@@ -920,8 +920,7 @@ td.create-show-cell {
   .sync-badge { max-width: 7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ---- Home: tables become lists (name over date, actions on the right) ---- */
-  #sessionDiscovery thead, #editShows thead { display: none; }
-  #sessionDiscovery table, #sessionDiscovery tbody, #sessionDiscovery tr, #sessionDiscovery td,
+  #editShows thead { display: none; }
   #editShows table, #editShows tbody, #editShows tfoot, #editShows tr, #editShows td { display: block; }
   #editShows tbody tr {
     display: grid;
@@ -931,11 +930,10 @@ td.create-show-cell {
     padding: 0.6rem 0.9rem;
     border-bottom: 1px solid var(--border-color);
   }
-  #editShows tbody td, #sessionDiscovery tbody td { padding: 0; border: none; white-space: normal; }
+  #editShows tbody td { padding: 0; border: none; white-space: normal; }
   #editShows tbody td:nth-child(1) { grid-column: 1; font-weight: 600; overflow-wrap: anywhere; }
   #editShows tbody td:nth-child(2) { grid-column: 1; color: var(--text-muted); font-size: 0.8rem; }
   #editShows tbody td:nth-child(3) { grid-column: 2; grid-row: 1 / span 2; }
-  #sessionDiscovery tbody td { padding: 0.9rem; color: var(--text-muted); }
   #createShowBtn { padding: 1rem; }
 
   /* ---- Show editor: summary strip on top, the run sheet below as cue cards ---- */
@@ -1014,3 +1012,68 @@ td.create-show-cell {
   tbody tr:hover { background-color: transparent; }
   .lines-table tbody tr:hover { background-color: transparent; }
 }
+
+/* ==========================================================================
+   Session panel
+   ========================================================================== */
+/* The QR code keeps its own black-on-white so every camera can read it. */
+.session-qr {
+  align-self: center;
+  background: white;
+  border-radius: 8px;
+  padding: 0.5rem;
+  line-height: 0;
+}
+
+.session-qr svg { width: min(220px, 60vw); height: auto; }
+
+.session-code {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  user-select: text;
+}
+
+.device-row .btn { padding: 0.25rem 0.7rem; font-size: 0.75rem; }
+
+/* "Join a session" card on the home page (apps) */
+.join-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+}
+
+.join-card h3 {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.join-error { font-size: 0.8rem; color: var(--error-color); }
+.join-error:empty { display: none; }
+
+.found-list { display: flex; flex-direction: column; gap: 0.35rem; list-style: none; margin: 0; padding: 0; }
+.found-list:empty, .found-status:empty { display: none; }
+.found-status { font-size: 0.8rem; color: var(--text-muted); }
+
+.found-session {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.7rem;
+  background-color: var(--header-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.found-info { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.found-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.found-host { font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.found-session .btn { flex: none; }
+.found-session .btn:disabled { opacity: 0.45; cursor: default; }
+.join-manual { align-self: flex-start; }

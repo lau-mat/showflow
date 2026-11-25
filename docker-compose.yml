@@ -29,6 +29,9 @@ services:
       - REDIS_URL=redis://redis:6379
       - RUST_LOG=debug
       - AUTH_JWT_SECRET=${AUTH_JWT_SECRET:?Set AUTH_JWT_SECRET to a random secret of at least 32 bytes}
+      # Optional: signs caller passes (account-based show caller access). 32 random bytes in
+      # base64 (`openssl rand -base64 32`); unset switches the feature off. Keep it stable.
+      - CALLER_PASS_KEY=${CALLER_PASS_KEY:-}
       # Plain-http local gateway: browsers drop Secure cookies there. Remove behind https.
       - AUTH_COOKIE_INSECURE=1
     depends_on:

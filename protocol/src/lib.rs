@@ -5,5 +5,8 @@
 //! fractional position keys that keep script lines ordered while several people insert.
 
 pub mod position;
+pub mod caller_pass;
+pub mod discovery;
+pub mod session;
 pub mod show;
 pub mod sync;

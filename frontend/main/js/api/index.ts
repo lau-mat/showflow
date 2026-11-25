@@ -5,9 +5,10 @@ import { SyncEngine } from "../sync/engine";
 import { LiveUpdates } from "../sync/live";
 import { ChangeBus } from "../sync/bus";
 import { SyncStatusStore } from "../sync/status";
-import { createIpcDataApi, createIpcHostApi, createIpcSyncApi } from "./ipc";
+import { refreshCallerAccess } from "../sync/caller_access";
+import { createIpcCallerApi, createIpcDataApi, createIpcDiscoveryApi, createIpcHostApi, createIpcSyncApi } from "./ipc";
 import { createRestAuthApi, createRestDataApi, createRestShareApi, RestClient } from "./rest";
-import type { AuthApi, DataApi, HostApi, ShareApi } from "./types";
+import type { AuthApi, DataApi, DiscoveryApi, HostApi, ShareApi } from "./types";
 
 export interface ApiBundle {
     auth: AuthApi;
@@ -16,6 +17,8 @@ export interface ApiBundle {
     data: DataApi;
     /** Null where the platform cannot host sessions. */
     host: HostApi | null;
+    /** Null where the platform cannot search the network (a browser). */
+    discovery: DiscoveryApi | null;
     /** Keeps the local database converged with the cloud; null on the web (no local copy). */
     sync: SyncEngine | null;
     syncStatus: SyncStatusStore;
@@ -74,7 +77,11 @@ export async function initApi(profile: PlatformProfile = getPlatform()): Promise
     const bus = new ChangeBus();
     const syncStatus = new SyncStatusStore();
     const local = profile.transport === "ipc";
-    const sync = local ? new SyncEngine({ session, rest: client, local: createIpcSyncApi(), bus, status: syncStatus }) : null;
+    const callers = createIpcCallerApi();
+    const sync = local ? new SyncEngine({
+        session, rest: client, local: createIpcSyncApi(), bus, status: syncStatus,
+        afterPull: index => refreshCallerAccess(index, { rest: client, local: callers })
+    }) : null;
     const live = new LiveUpdates({
         open: signal => client.stream("sync/stream", signal),
         session,
@@ -91,6 +98,7 @@ export async function initApi(profile: PlatformProfile = getPlatform()): Promise
         session,
         data: local ? createIpcDataApi(bus) : createRestDataApi(client, bus),
         host: profile.features.sessionHost ? createIpcHostApi() : null,
+        discovery: profile.features.sessionDiscovery ? createIpcDiscoveryApi() : null,
         sync,
         syncStatus,
         bus,

@@ -1,3 +1,4 @@
+import type { AccessKind, AccessSettings, AccessMethod } from "/shared/js/session_types";
 import type { Change, Op } from "/shared/js/sync_types";
 import type {
     ScenarioLine, ScenarioLineComment, Show, ShowDetails, ShowRole
@@ -113,10 +114,70 @@ export interface DataApi {
     editComment(showId: string, commentId: string, roleId: string | null, comment: string): Promise<void>;
 }
 
-/** Hosting a live session (show logic). Only exists where `sessionHost` is available. */
+/** A running session on this computer (app/src/session/commands.rs). */
+export interface SessionInfo {
+    session_id: string;
+    show_id: string;
+    show_name: string;
+    /** The one address everyone joins with. */
+    url: string;
+}
+
+/** What the host's session panel shows (showlogic::HostView). */
+export interface HostView {
+    settings: AccessSettings;
+    /** Code entry is paused after many wrong tries (per gate). */
+    view_paused_seconds: number | null;
+    call_paused_seconds: number | null;
+    current_cue: number | null;
+    people: { client_id: string; name: string | null; role_id: string | null; admitted: boolean; is_caller: boolean; is_host: boolean }[];
+    callers: { grant_id: string; name: string; method: AccessMethod; online: boolean }[];
+    requests: { client_id: string; name: string; kind: AccessKind }[];
+}
+
+export interface SessionStatus extends SessionInfo {
+    view: HostView;
+    /** This computer has what it needs to check account passes for the show. */
+    account_ready: boolean;
+    /** Other apps on the network can find this session without typing its address. */
+    discoverable: boolean;
+}
+
+/** A session running on another computer on the network. */
+export interface FoundSession {
+    host: string;
+    port: number;
+    session_id: string;
+    show_name: string;
+    /** False when that host runs a ShowFlow version this one cannot talk to. */
+    compatible: boolean;
+}
+
+export interface DiscoveryApi {
+    /** Searches the local network; takes about a second. */
+    find(): Promise<FoundSession[]>;
+}
+
+/** Hosting live sessions (show logic). Only exists where `sessionHost` is available. */
 export interface HostApi {
-    startSession(showId: string): Promise<string>;
-    onSessionStopped(callback: () => void): Promise<() => void>;
+    /** Starts at once, with the show's settings. */
+    startSession(showId: string): Promise<SessionInfo>;
+    listSessions(): Promise<SessionInfo[]>;
+    status(sessionId: string): Promise<SessionStatus>;
+    stopSession(sessionId: string): Promise<void>;
+    /** A typed code, or (with `null`) a generated hexadecimal one of `length` characters. */
+    setCode(sessionId: string, kind: AccessKind, code: string | null, length?: number): Promise<void>;
+    answerRequest(sessionId: string, clientId: string, kind: AccessKind, approve: boolean): Promise<void>;
+    /** Puts a device out of a protected session. */
+    removeDevice(sessionId: string, clientId: string): Promise<void>;
+    revokeCaller(sessionId: string, grantId: string): Promise<void>;
+    openCallerWindow(sessionId: string): Promise<void>;
+    qr(sessionId: string): Promise<string>;
+    /** Who may join and call a show: what was saved, or the defaults. */
+    settings(showId: string): Promise<AccessSettings>;
+    /** Saves them; a running session of the show follows at once. */
+    saveSettings(showId: string, settings: AccessSettings): Promise<void>;
+    onSessionUpdated(callback: (sessionId: string) => void): Promise<() => void>;
 }
 
 /** The local side of syncing (apps only): the outbox and the cursors in the app database. */
@@ -127,6 +188,21 @@ export interface SyncApi {
     applyChanges(showId: string, changes: Change[], rev: number, role: string | null): Promise<void>;
     forgetShow(showId: string): Promise<void>;
     adoptAccount(userId: string): Promise<number>;
+}
+
+/** A show's people by account id: members may join by account, callers may also call. */
+export interface ShowAccess {
+    members: string[];
+    callers: string[];
+}
+
+/** The app database's side of account-based access to sessions. */
+export interface CallerStoreApi {
+    /** This device's public key and the passes the signed-in account holds. */
+    state(): Promise<{ device_key: string; passes: { show_id: string; expires_at: number }[] }>;
+    savePass(showId: string, pass: string, expiresAt: number): Promise<void>;
+    /** What a host needs to check passes offline: the cloud's key, and who belongs to each show. */
+    saveTrust(publicKey: string, lists: Record<string, ShowAccess>): Promise<void>;
 }
 
 export interface SyncShowState {
@@ -153,6 +229,8 @@ export interface Member {
     user_id: string;
     username: string;
     role: string;
+    /** May become show caller in a live session with their account (the owner always). */
+    can_call: boolean;
     is_me: boolean;
 }
 
@@ -192,6 +270,7 @@ export interface NewInvite {
 export interface ShareApi {
     members(showId: string): Promise<Member[]>;
     setRole(showId: string, userId: string, role: string): Promise<void>;
+    setCaller(showId: string, userId: string, canCall: boolean): Promise<void>;
     removeMember(showId: string, userId: string): Promise<void>;
     invites(showId: string): Promise<InviteInfo[]>;
     createInvite(showId: string, invite: NewInvite): Promise<Invited>;

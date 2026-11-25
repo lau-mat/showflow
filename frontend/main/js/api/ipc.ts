@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ChangeBus } from "../sync/bus";
-import type { DataApi, HostApi, LineEdit, SyncApi } from "./types";
+import type { CallerStoreApi, DataApi, DiscoveryApi, HostApi, LineEdit, SyncApi } from "./types";
 
 /** The API's camelCase edit as the op fields the store expects. */
 function lineFields(changes: LineEdit): Record<string, unknown> {
@@ -41,9 +41,32 @@ export function createIpcSyncApi(): SyncApi {
     };
 }
 
+export function createIpcCallerApi(): CallerStoreApi {
+    return {
+        state: () => invoke("caller_state"),
+        savePass: (showId, pass, expiresAt) => invoke("caller_save_pass", { showId, pass, expiresAt }),
+        saveTrust: (publicKey, lists) => invoke("caller_save_trust", { publicKey, lists })
+    };
+}
+
 export function createIpcHostApi(): HostApi {
     return {
         startSession: showId => invoke("start_session", { showId }),
-        onSessionStopped: callback => listen("session-stopped", callback)
+        listSessions: () => invoke("list_sessions"),
+        status: sessionId => invoke("session_status", { sessionId }),
+        stopSession: sessionId => invoke("stop_session", { sessionId }),
+        setCode: (sessionId, kind, code, length) => invoke("set_access_code", { sessionId, kind, code, length }),
+        answerRequest: (sessionId, clientId, kind, approve) => invoke("answer_access_request", { sessionId, clientId, kind, approve }),
+        removeDevice: (sessionId, clientId) => invoke("remove_device", { sessionId, clientId }),
+        revokeCaller: (sessionId, grantId) => invoke("revoke_caller", { sessionId, grantId }),
+        openCallerWindow: sessionId => invoke("open_caller_window", { sessionId }),
+        qr: sessionId => invoke("session_qr", { sessionId }),
+        settings: showId => invoke("session_settings", { showId }),
+        saveSettings: (showId, settings) => invoke("save_session_settings", { showId, settings }),
+        onSessionUpdated: callback => listen<string>("session-updated", event => callback(event.payload))
     };
+}
+
+export function createIpcDiscoveryApi(): DiscoveryApi {
+    return { find: () => invoke("discover_sessions") };
 }

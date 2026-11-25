@@ -20,9 +20,10 @@ use axum::{
     routing::{delete, get, post},
     Json, Router,
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD}, Engine};
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use protocol::caller_pass::{signing_key, SigningKey};
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -43,11 +44,34 @@ pub struct AuthConfig {
     cookie_path: String,
     /// `Secure` cookies need https; `AUTH_COOKIE_INSECURE=1` allows plain-http development.
     cookie_secure: bool,
+    /// Signs caller passes; `None` switches account-based caller access off.
+    caller_key: Option<SigningKey>,
 }
 
 impl AuthConfig {
     pub fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
-        Self::new(&env::var("AUTH_JWT_SECRET")?)
+        let config = Self::new(&env::var("AUTH_JWT_SECRET")?)?;
+        // Compose passes an unset variable on as an empty string.
+        match env::var("CALLER_PASS_KEY").ok().filter(|key| !key.trim().is_empty()) {
+            Some(key) => config.with_caller_key(&key),
+            None => Ok(config),
+        }
+    }
+
+    /// `seed` is 32 random bytes in base64 (`openssl rand -base64 32`). Replacing it makes every
+    /// pass issued before worthless until hosts and callers have synced again.
+    pub(crate) fn with_caller_key(mut self, seed: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let seed: [u8; 32] = STANDARD
+            .decode(seed.trim())
+            .ok()
+            .and_then(|bytes| bytes.try_into().ok())
+            .ok_or("CALLER_PASS_KEY must be 32 random bytes in base64 (openssl rand -base64 32)")?;
+        self.caller_key = Some(signing_key(seed));
+        Ok(self)
+    }
+
+    pub(crate) fn caller_key(&self) -> Option<&SigningKey> {
+        self.caller_key.as_ref()
     }
 
     pub(crate) fn new(secret: &str) -> Result<Self, Box<dyn std::error::Error>> {
@@ -61,6 +85,7 @@ impl AuthConfig {
                 .map_err(|_| "Failed to initialize password verification")?,
             cookie_path: env::var("AUTH_COOKIE_PATH").unwrap_or_else(|_| "/api/auth".to_owned()),
             cookie_secure: env::var("AUTH_COOKIE_INSECURE").as_deref() != Ok("1"),
+            caller_key: None,
         })
     }
 

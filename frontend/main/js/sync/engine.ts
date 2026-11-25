@@ -16,14 +16,18 @@ export interface SyncEngineDeps {
     local: SyncApi;
     bus: ChangeBus;
     status: SyncStatusStore;
+    /** Runs after a pull with the cloud's show list (apps: keeps caller access current). */
+    afterPull?: (index: ServerShow[]) => Promise<void>;
     now?: () => number;
     /** Injectable for tests; defaults to the real timers. */
     setTimer?: (callback: () => void, ms: number) => unknown;
     clearTimer?: (handle: unknown) => void;
 }
 
-interface ServerShow extends Show {
+export interface ServerShow extends Show {
     rev: number;
+    members?: string[];
+    callers?: string[];
 }
 
 /** Ops per request: the server accepts up to 500, smaller batches keep retries cheap. */
@@ -194,6 +198,7 @@ export class SyncEngine {
             }
         }
         if (listChanged.value) bus.emitExternal(null);
+        await this.deps.afterPull?.(index);
     }
 
     stop(): void {

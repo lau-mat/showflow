@@ -1,4 +1,5 @@
 mod auth_store;
+mod caller_store;
 mod db;
 mod platform;
 mod session;
@@ -6,7 +7,7 @@ mod store;
 mod sync_store;
 
 use std::sync::{Arc, Mutex};
-use tauri::{State, Manager, Emitter};
+use tauri::{State, Manager};
 use tauri_plugin_opener;
 use protocol::show::{MemberRole, ScenarioLine, ScenarioLineComment, Show, ShowDetails, ShowRole};
 use protocol::sync::{EntityKind, OpKind, Place};
@@ -137,31 +138,9 @@ pub fn run() {
             let conn = db::init_db().expect("Failed to initialize database");
             app.manage(db::DbState(Arc::new(Mutex::new(conn))));
 
-            app.manage(session::AppState {
-            session: Arc::new(Mutex::new(None)),
-                shutdown_tx: Mutex::new(None),  
-            });
-            
+            app.manage(session::Sessions::discoverable(protocol::discovery::DISCOVERY_PORT));
+
             Ok(())
-        })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                // Check if the closed window is the master window
-                if window.label() == "session-manager" {
-                    let state = window.state::<session::AppState>();
-
-                    if let Ok(mut session_guard) = state.session.lock() {
-                        *session_guard = None;
-                    }
-                    
-                    // Take the channel out and send the broadcast shutdown signal
-                    if let Some(tx) = state.shutdown_tx.lock().unwrap().take() {
-                        let _ = tx.send(()); // Triggers both rx_http and rx_ws
-                    };
-
-                    let _ = window.emit("session-stopped", ());
-                }
-            }
         })
         .invoke_handler(tauri::generate_handler![
             new_show,
@@ -175,8 +154,24 @@ pub fn run() {
             delete_scenario_line,
             add_scenario_line_comment,
             edit_scenario_line_comment,
-            session::start_session,
-            session::generate_server_qr,
+            session::commands::start_session,
+            session::commands::list_sessions,
+            session::commands::session_status,
+            session::commands::stop_session,
+            session::commands::set_access_code,
+            session::commands::answer_access_request,
+            session::commands::remove_device,
+            session::commands::revoke_caller,
+            session::commands::open_caller_window,
+            session::commands::caller_host_token,
+            session::commands::session_qr,
+            session::commands::session_settings,
+            session::commands::save_session_settings,
+            session::commands::discover_sessions,
+            caller_store::caller_state,
+            caller_store::caller_save_pass,
+            caller_store::caller_save_trust,
+            caller_store::caller_claim,
             platform::platform_info,
             auth_store::auth_load,
             auth_store::auth_save,

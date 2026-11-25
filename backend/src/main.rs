@@ -4,6 +4,7 @@ use std::env;
 
 mod api_error;
 mod auth;
+mod caller_pass;
 mod cors;
 mod mail;
 mod sharing;
@@ -64,6 +65,7 @@ async fn start_server(pool: PgPool, auth: auth::AuthConfig) -> Result<(), std::i
         .merge(auth::routes())
         .merge(shows::routes())
         .merge(sharing::routes())
+        .merge(caller_pass::routes())
         .merge(sync_stream::routes())
         .with_state(state)
         .layer(axum::middleware::from_fn_with_state(origins, cors::layer));
