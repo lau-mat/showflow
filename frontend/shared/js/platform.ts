@@ -60,7 +60,7 @@ export const PROFILES: Record<PlatformKind, ProfileDefinition> = {
         offlineGraceDays: 14,
         loginPage: "login",
         registerPage: "register",
-        landingPage: "sessions",
+        landingPage: "home",
         tokenStorage: "device",
         features: features(["showEditor", "sessionView", "sessionDiscovery", "offlineData"])
     },

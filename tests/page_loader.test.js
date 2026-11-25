@@ -27,7 +27,7 @@ test("unauthenticated users are sent to the platform login page", () => {
 test("authorized users reach pages; unknown pages fall back to the platform landing page", () => {
     assert.equal(resolvePage("home", pages, desktop, true), "home");
     assert.equal(resolvePage("nope", pages, desktop, true), "home");
-    assert.equal(resolvePage("nope", pages, mobile, true), "sessions");
+    assert.equal(resolvePage("nope", pages, mobile, true), "home");
     assert.equal(resolvePage("nope", pages, web, false), "login");
 });
 
@@ -81,8 +81,8 @@ test("starting without a hash lands unauthenticated users on login and authorize
     const user = setupRouter(mobile, true);
     await user.router.start();
     await settle();
-    assert.equal(user.win.location.hash, "#sessions");
-    assert.deepEqual(user.loaded, ["sessions"]);
+    assert.equal(user.win.location.hash, "#home");
+    assert.deepEqual(user.loaded, ["home"]);
 });
 
 test("each page renders once per navigation and the main section is cleared first", async () => {

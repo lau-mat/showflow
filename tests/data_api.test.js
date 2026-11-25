@@ -106,3 +106,30 @@ test("newOp makes a fresh idempotency key per op and only includes what it was g
     assert.deepEqual(Object.keys(a).sort(), ["entity", "id", "kind", "op_id"]);
     assert.deepEqual(newOp("line", "id", "set", { name: "x" }, { after: null }).place, { after: null });
 });
+
+test("editing a cue pushes only the fields that changed, under the server's field names", async () => {
+    const { api, requests } = setup(async (_url, init) => {
+        const { ops } = JSON.parse(init.body);
+        return ok({ results: ops.map(op => applied(op)), rev: 1 });
+    });
+    await api.editLine("show-1", "line-1", { name: "New title", absoluteTime: 1_800_000_000 });
+    await api.editLine("show-1", "line-1", { absoluteTime: null });
+    const [first, second] = requests.map(r => r.body.ops[0]);
+    assert.deepEqual([first.entity, first.id, first.kind], ["line", "line-1", "set"]);
+    assert.deepEqual(first.fields, { name: "New title", absolute_time: 1_800_000_000 });
+    assert.deepEqual(second.fields, { absolute_time: null }, "clearing a fixed time is an explicit null");
+    assert.equal(requests[0].url, "/api/shows/show-1/ops");
+});
+
+test("editing the show pushes only the changed details as an op on the show itself", async () => {
+    const { api, requests } = setup(async (_url, init) => {
+        const { ops } = JSON.parse(init.body);
+        return ok({ results: ops.map(op => applied(op)), rev: 1 });
+    });
+    await api.editShow("show-1", { name: "Renamed" });
+    await api.editShow("show-1", { time: 1_800_000_000 });
+    const [first, second] = requests.map(r => r.body.ops[0]);
+    assert.deepEqual([first.entity, first.id, first.kind, first.fields], ["show", "show-1", "set", { name: "Renamed" }]);
+    assert.deepEqual(second.fields, { time: 1_800_000_000 });
+    assert.equal(requests[0].url, "/api/shows/show-1/ops");
+});

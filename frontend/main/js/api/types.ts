@@ -78,6 +78,21 @@ export interface NewScenarioLine {
     absoluteTime: number | null;
 }
 
+/** The details of a show that can be changed; only the ones present are sent. */
+export interface ShowEdit {
+    name?: string;
+    /** Start time, epoch seconds. */
+    time?: number;
+}
+
+/** The fields of a cue that can be changed after it exists; only the ones present are sent. */
+export interface LineEdit {
+    name?: string;
+    note?: string;
+    duration?: number;
+    absoluteTime?: number | null;
+}
+
 /** Show content. Tauri IPC (local sqlite) in the apps, REST on the web. */
 export interface DataApi {
     /**
@@ -87,10 +102,12 @@ export interface DataApi {
     subscribe(listener: (change: { showId: string | null; rev?: number }) => void): () => void;
     getShows(): Promise<Show[]>;
     newShow(name: string, time: number): Promise<Show>;
+    editShow(showId: string, changes: ShowEdit): Promise<void>;
     deleteShow(id: string): Promise<void>;
     getShowDetails(showId: string): Promise<ShowDetails>;
     addRole(showId: string, roleName: string): Promise<ShowRole>;
     addLine(line: NewScenarioLine): Promise<ScenarioLine>;
+    editLine(showId: string, lineId: string, changes: LineEdit): Promise<void>;
     deleteLine(showId: string, lineId: string): Promise<void>;
     addComment(showId: string, lineId: string, roleId: string | null, comment: string): Promise<ScenarioLineComment>;
     editComment(showId: string, commentId: string, roleId: string | null, comment: string): Promise<void>;

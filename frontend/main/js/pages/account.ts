@@ -29,7 +29,7 @@ function accountContent(session: AuthSession, devices: Device[] | null, notice: 
 
     return [
         { type: "div", classes: "account-body", varId: "accountBody" },
-        { type: "h3", text: session.user?.username ?? "Account", target: "@accountBody" },
+        { type: "h3", classes: "account-name", text: session.user?.username ?? "Account", target: "@accountBody" },
         { type: "p", classes: "account-email", text: session.user?.email ?? "", target: "@accountBody" },
         ...(notice ? [{ type: "p", classes: "modal-error-message", text: notice, target: "@accountBody" }] : []),
         ...(session.state === "offlineGrace"

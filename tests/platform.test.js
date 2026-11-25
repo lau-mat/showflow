@@ -30,7 +30,7 @@ test("inside Tauri the native platform command decides between desktop and mobil
     reset(true, { kind: "mobile", os: "android" });
     const mobile = await platform.detectPlatform();
     assert.deepEqual([mobile.kind, mobile.os, mobile.transport], ["mobile", "android", "ipc"]);
-    assert.equal(mobile.landingPage, "sessions");
+    assert.equal(mobile.landingPage, "home", "phones open the shows list, which also offers session discovery");
 });
 
 test("detection runs once and is memoised", async () => {

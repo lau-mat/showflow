@@ -1,7 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ChangeBus } from "../sync/bus";
-import type { DataApi, HostApi, SyncApi } from "./types";
+import type { DataApi, HostApi, LineEdit, SyncApi } from "./types";
+
+/** The API's camelCase edit as the op fields the store expects. */
+function lineFields(changes: LineEdit): Record<string, unknown> {
+    const { absoluteTime, ...rest } = changes;
+    return { ...rest, ...(absoluteTime !== undefined ? { absolute_time: absoluteTime } : {}) };
+}
 
 /** Local-first show data: every edit lands in the app database at once and is synced later. */
 export function createIpcDataApi(bus: ChangeBus): DataApi {
@@ -11,10 +17,12 @@ export function createIpcDataApi(bus: ChangeBus): DataApi {
         subscribe: listener => bus.subscribe(listener),
         getShows: () => invoke("get_shows"),
         newShow: (name, time) => written(invoke("new_show", { name, time })),
+        editShow: (showId, changes) => written(invoke("edit_show", { showId, fields: changes })),
         deleteShow: id => written(invoke("delete_show", { id })),
         getShowDetails: showId => invoke("get_full_show_details", { showId }),
         addRole: (showId, roleName) => written(invoke("add_role", { showId, roleName })),
         addLine: line => written(invoke("add_scenario_line", { ...line })),
+        editLine: (_showId, lineId, changes) => written(invoke("edit_scenario_line", { lineId, fields: lineFields(changes) })),
         // The local store finds the show from the line/comment itself, so `showId` is not sent.
         deleteLine: (_showId, lineId) => written(invoke("delete_scenario_line", { lineId })),
         addComment: (_showId, lineId, roleId, comment) => written(invoke("add_scenario_line_comment", { lineId, roleId, comment })),

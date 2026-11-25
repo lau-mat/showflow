@@ -27,6 +27,16 @@ fn new_show(state: State<'_, db::DbState>, name: &str, time: i64) -> Result<Show
     Ok(Show { id: id.to_string(), name: name.to_string(), time, role: MemberRole::Owner })
 }
 
+/// Changes the show's `name` and/or `time`; only the fields given are touched.
+#[tauri::command]
+fn edit_show(state: State<'_, db::DbState>, show_id: &str, fields: serde_json::Map<String, serde_json::Value>) -> Result<(), String> {
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    let mut op = new_op(EntityKind::Show, parse_id(show_id)?, OpKind::Set, serde_json::Value::Null);
+    op.fields = fields;
+    apply_local(&mut conn, show_id, op)?;
+    Ok(())
+}
+
 #[tauri::command]
 fn get_shows(state: State<'_, db::DbState>) -> Result<Vec<Show>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
@@ -73,6 +83,21 @@ fn add_scenario_line(state: State<'_, db::DbState>, show_id: &str, after: Option
         duration,
         absolute_time,
     })
+}
+
+/// Changes some fields of a cue (`name`, `note`, `duration`, `absolute_time`); only those given are
+/// touched. Moving a cue is not an edit: its position is not accepted here.
+#[tauri::command]
+fn edit_scenario_line(state: State<'_, db::DbState>, line_id: &str, fields: serde_json::Map<String, serde_json::Value>) -> Result<(), String> {
+    if fields.keys().any(|key| key == "position") {
+        return Err("A cue cannot be moved with an edit".into());
+    }
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    let show_id = store::show_for(&mut conn, EntityKind::Line, line_id)?;
+    let mut op = new_op(EntityKind::Line, parse_id(line_id)?, OpKind::Set, serde_json::Value::Null);
+    op.fields = fields;
+    apply_local(&mut conn, &show_id, op)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -141,10 +166,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             new_show,
             get_shows,
+            edit_show,
             delete_show,
             get_full_show_details,
             add_role,
             add_scenario_line,
+            edit_scenario_line,
             delete_scenario_line,
             add_scenario_line_comment,
             edit_scenario_line_comment,

@@ -51,6 +51,7 @@ Any changes to dynamic generator should be aproved first.
 We aim to keep html has lightweight and clean as possible and generator componenets dynamically as needed. To avoid code cluttering, pages should have their own logic and definition that lives inside the pages folder.
 
 ### visual
+Design for a 360px-wide phone first-class, not as an afterthought (the mobile apps use this same UI). Breakpoints are documented at the top of `shared/style/boxes.css`: `@media (max-width: 880px)` is the compact layout (phones, tablets in portrait), `@media (pointer: coarse)` is touch sizing (44px targets, 16px form text so iOS does not zoom), `@media (hover: none)` neutralises sticky hover. Use `100dvh` (with a `100vh` fallback) and `env(safe-area-inset-*)`, never a bare `100vh` for full-height UI. The cue table becomes cards in compact (tap a card to reveal its actions). `node tests/e2e/responsive.check.mjs <dev server url> <dir>` (Chrome, no backend) checks overflow, dialog fit and touch sizes on six emulated devices and writes screenshots.
 We build darkmode first, attempt to keep interfaces dense but without clutter to give maximum overview. The colors in colors.css should be respected a much as possible, the introduction of new color should be approved first.
 We should transfer to "Inter" as our main font.
 All icons should use the svg component inside dyanmic generator.

@@ -1,5 +1,12 @@
 /* ==========================================================================
    boxes.css - Shared Dialog & Stack Manager Styles
+
+   Responsive rules (media queries cannot read variables, so the values live here):
+     compact layout  @media (max-width: 880px)   phones, tablets in portrait, narrow windows
+     touch sizing    @media (pointer: coarse)    any touch screen: 44px targets, 16px inputs
+     hover effects   @media (hover: hover)       so they do not stick after a tap
+   Heights use dvh (the visible area; 100vh is taller than a phone's) with a vh fallback, and
+   edges respect env(safe-area-inset-*) for notches and system bars.
    ========================================================================== */
 
 /* Dynamic Backdrop Overlay */
@@ -9,6 +16,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   background-color: var(--modal-overlay, rgba(0, 0, 0, 0.7));
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px); /* Safari support */
@@ -30,6 +38,10 @@
   overflow: hidden;
   animation: dialogSlideUp 0.15s ease-out;
   box-sizing: border-box;
+  /* Inline widths (the share box asks for 560px) must never push a dialog off a small screen. */
+  max-width: calc(100vw - 1rem);
+  max-height: calc(100vh - 1rem);
+  max-height: calc(100dvh - 1rem);
 }
 
 /* Specific Prompt Modal Width */
@@ -37,6 +49,7 @@
   width: 90%;
   max-width: 500px;
   max-height: 85vh; /* Natural height ceiling */
+  max-height: min(85dvh, calc(100dvh - 1rem));
   display: flex;
   flex-direction: column;
 }
@@ -45,7 +58,10 @@
 .dialog-box.fullscreen {
   width: 100vw !important;
   height: 100vh !important;
+  height: 100dvh !important;
+  max-width: none !important;
   max-height: 100vh !important;
+  max-height: 100dvh !important;
   top: 0 !important;
   left: 0 !important;
   transform: none !important;
@@ -448,3 +464,92 @@
 
 /* Breathing room around the time components, without changing spacing in other forms. */
 .form-group:has(.time-field, .datetime-picker, .choice-group) { margin-block: 0.4rem; }
+
+
+/* ==========================================================================
+   Responsive: dialogs, touch, compact
+   ========================================================================== */
+.modal-content { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+
+/* A fullscreen box clears the notch at the top and the home indicator at the bottom. */
+.dialog-box.fullscreen .modal-header { padding-top: calc(0.4rem + env(safe-area-inset-top, 0px)); }
+.dialog-box.fullscreen .modal-content {
+  padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px)) !important;
+  padding-left: calc(0.6rem + env(safe-area-inset-left, 0px)) !important;
+  padding-right: calc(0.6rem + env(safe-area-inset-right, 0px)) !important;
+}
+
+button, select, .chip, .choice-btn, .cal-day, .seg-btn, .cal-nav {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Touch screens: fingertip-sized targets, and 16px form text so iOS does not zoom on focus. */
+@media (pointer: coarse) {
+  .modal-content input,
+  .modal-content select,
+  .modal-content textarea { font-size: 16px; }
+
+  .modal-header { min-height: 2.75rem; }
+  .modal-header .close-btn {
+    box-sizing: content-box;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0.6rem;
+    margin: -0.6rem;
+  }
+
+  .btn { min-height: 2.75rem; }
+  .modal-content input, .modal-content select, .modal-content textarea { min-height: 2.75rem; }
+  .modal-content .seg-input { min-height: 2.75rem; }
+  .seg-btn { height: 2.75rem; width: 3.4rem; }
+  .cal-nav { width: 2.75rem; height: 2.75rem; }
+  .cal-day { height: 2.75rem; font-size: 0.95rem; }
+  .chip { min-height: 2.75rem; padding: 0 0.9rem; font-size: 0.85rem; }
+  .choice-btn { min-height: 2.75rem; }
+}
+
+/* Hover effects only where there is a hover; on touch they would stay stuck after a tap. */
+@media (hover: none) {
+  .cal-day:hover { background-color: transparent; }
+  .chip:hover { border-color: var(--border-color, #2e2e35); color: var(--text-muted, #93939e); }
+  .seg-btn:hover, .cal-nav:hover { background-color: transparent; color: var(--text-muted, #93939e); }
+  .choice-btn:hover { color: var(--text-muted, #93939e); }
+  .choice-btn.is-active:hover { color: var(--accent-color, #f59e0b); }
+}
+
+@media (max-width: 880px) {
+  /* Prompts hang from the top instead of floating in the middle, so the on-screen keyboard
+     (which shrinks the visible height) never covers the field being typed in. */
+  .dialog-box:not(.fullscreen) {
+    top: max(env(safe-area-inset-top, 0px), 0.5rem) !important;
+    transform: translateX(-50%) !important;
+  }
+  .modal-box { width: calc(100vw - 1rem); }
+  .modal-box .modal-content { padding: 1rem; }
+  /* The buttons stay in reach while a tall form (the calendar) scrolls underneath. */
+  .modal-footer {
+    flex-wrap: wrap;
+    position: sticky;
+    bottom: -1rem;
+    margin: 0 -1rem -1rem;
+    padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    background-color: var(--surface-color, #212126);
+    border-top: 1px solid var(--border-color, #2e2e35);
+    z-index: 2;
+  }
+  .modal-footer .btn { flex: 1 1 8rem; }
+
+  .dialog-box.fullscreen .modal-header { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .datetime-picker, .time-field { padding: 0.4rem; }
+  .cal-weekdays, .cal-grid { gap: 0.1rem; }
+  .cal-head { gap: 0.2rem; }
+  .cal-title { font-size: 0.85rem; }
+  .time-colon { font-size: 1.2rem; }
+  .choice-btn { padding-inline: 0.4rem; line-height: 1.2; }
+}
+
+@media (max-width: 360px) {
+  .modal-content .seg-input { width: 3rem; font-size: 1.35rem; }
+  .seg-btn { width: 3rem; }
+}

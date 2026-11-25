@@ -129,6 +129,9 @@ export function createRestDataApi(client: RestClient, bus: ChangeBus): DataApi {
             await setField(id, "show", id, { name, time });
             return { id, name, time, role: "owner" };
         },
+        async editShow(showId, changes) {
+            await setField(showId, "show", showId, { ...changes });
+        },
         async deleteShow(id) {
             await pushOps(id, [newOp("show", id, "delete")]);
         },
@@ -153,6 +156,10 @@ export function createRestDataApi(client: RestClient, bus: ChangeBus): DataApi {
                 duration: line.duration,
                 absolute_time: line.absoluteTime
             };
+        },
+        async editLine(showId, lineId, changes) {
+            const { absoluteTime, ...rest } = changes;
+            await setField(showId, "line", lineId, { ...rest, ...(absoluteTime !== undefined ? { absolute_time: absoluteTime } : {}) });
         },
         async deleteLine(showId, lineId) {
             await pushOps(showId, [newOp("line", lineId, "delete")]);

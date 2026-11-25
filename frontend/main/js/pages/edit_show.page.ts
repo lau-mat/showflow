@@ -4,6 +4,7 @@ import { hasFeature } from "/shared/js/platform";
 import { formatScenarioLineDuration, formatScenarioLineTime, resolveScenarioLineStartTimestamp } from "/shared/js/scenario_time";
 import { composeDateTime, decomposeDateTime } from "/shared/js/time_math";
 import { getApi } from "../api";
+import type { LineEdit, ShowEdit } from "../api/types";
 import { openShareBox } from "./share_show";
 import { canComment, canEditContent, sortCommentsByRole, type ScenarioLine, type ScenarioLineComment, type ShowDetails, type ShowRole } from "/shared/js/show_types";
 
@@ -52,6 +53,8 @@ async function refreshShowData(): Promise<void> {
 
     // If the box is already open, just refresh its content dynamically
     if (currentBox && currentBox.container.style.display !== "none") {
+        const title = currentBox.header?.querySelector("h2");
+        if (title) title.textContent = `Show Manager — ${data.show.name}`;
         currentBox.refreshContent(buildEditShowLayout(data));
     } else {
         currentBox = addHoverBox(
@@ -80,8 +83,8 @@ function buildEditShowLayout(data: ShowDetails): ElementDefinition[] {
         { type: "h3", text: "Show Details", target: "@editorCard" },
         { type: "div", classes: "stat-grid", varId: "stats", target: "@editorCard" },
         ...showStats(data).flatMap(([label, value]) => [
-            { type: "span", classes: "stat-label", text: label, target: "@stats" },
-            { type: "span", classes: "stat-value", text: value, target: "@stats" }
+            { type: "span", classes: "stat-label", text: label, data: { stat: label.toLowerCase() }, target: "@stats" },
+            { type: "span", classes: "stat-value", text: value, data: { stat: label.toLowerCase() }, target: "@stats" }
         ]),
 
         // Sidebar: Roles Card
@@ -98,7 +101,10 @@ function buildEditShowLayout(data: ShowDetails): ElementDefinition[] {
 
         // Dedicated flex wrapper for header buttons
         { type: "div", classes: "header-actions-group", varId: "mainHeaderActions", target: "@mainHeader" },
-        ...(mayEdit ? [{ type: "svg", classes: ["btn-icon", "btn-outline-primary"], file: "icons/add.svg", events: { click: addLine }, target: "@mainHeaderActions" }] : []),
+        ...(mayEdit ? [
+            { type: "svg", classes: ["btn-icon", "btn-outline-primary"], file: "icons/add.svg", attributes: { title: "Add cue" }, events: { click: addLine }, target: "@mainHeaderActions" },
+            { type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/edit.svg", attributes: { title: "Edit show details" }, events: { click: editShowDetails }, target: "@mainHeaderActions" }
+        ] : []),
         { type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/share.svg", attributes: { title: "Share" }, events: { click: () => openShareBox(data.show.id, data.show.name, role) }, target: "@mainHeaderActions" },
         ...(hasFeature("print")
             ? [{ type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/print.svg", events: { click: openPrintDialog }, target: "@mainHeaderActions" }]
@@ -184,6 +190,15 @@ function showStats(data: ShowDetails): [string, string][] {
 }
 
 /**
+ * On a phone a cue is a card that reveals its actions when tapped (the CSS only reacts to
+ * `is-open` in the compact layout); taps on buttons and comments keep their own meaning.
+ */
+function toggleCue(event: Event): void {
+    if ((event.target as Element).closest(".btn-icon, .comment-bubble")) return;
+    (event.currentTarget as HTMLElement).classList.toggle("is-open");
+}
+
+/**
  * Builds a single table row for a Scenario Line and renders attached Comments inline
  */
 function buildLineRow(
@@ -198,7 +213,7 @@ function buildLineRow(
     const lineComments = allComments.filter(c => c.line_id === line.id);
 
     const content: ElementDefinition[] = [
-        { type: "tr", target: "@tableBody", data: { id: line.id }, varId: "lineRow" },
+        { type: "tr", target: "@tableBody", data: { id: line.id }, varId: "lineRow", events: { click: toggleCue } },
         { type: "td", classes: "line-number-cell", children: [
             { type: "div", classes: "startTime", text: formatScenarioLineTime(startTimestamp) },
             { type: "div", classes: "duration", text: formatScenarioLineDuration(line.duration) }
@@ -210,7 +225,7 @@ function buildLineRow(
         { type: "div", classes: "line-action-cell-wrapper", varId: "actionWrapper", target: "@actionCell" },
         ...(mayComment ? [{ type: "svg", file: "icons/add.svg", classes: ["btn-icon", "btn-outline-primary"], attributes: { title: "Add note" }, events: { click: () => addComment(line.id) }, target: "@actionWrapper" }] : []),
         ...(mayEdit ? [
-            { type: "svg", file: "icons/edit.svg", classes: ["btn-icon", "btn-muted"], target: "@actionWrapper" },
+            { type: "svg", file: "icons/edit.svg", classes: ["btn-icon", "btn-muted"], attributes: { title: "Edit cue" }, events: { click: () => editLine(line.id) }, target: "@actionWrapper" },
             { type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-danger"], events: { click: () => deleteLine(line.id) }, target: "@actionWrapper" }
         ] : [])
     ];
@@ -256,20 +271,28 @@ async function addRole(): Promise<void> {
     await refreshShowData();
 }
 
-async function addLine(): Promise<void> {
-    const showData = requireShowData();
-    const lastLine = showData.lines[showData.lines.length - 1];
+interface LineForm {
+    name: string;
+    note: string;
+    duration: number;
+    absoluteTime: number | null;
+}
+
+/** The dialog for a cue, empty for a new one or filled in from `line` when editing. */
+async function promptLine(showData: ShowDetails, options: { title: string; confirmText: string; line?: ScenarioLine }): Promise<LineForm | null> {
+    const { line } = options;
     // A fixed start time is a time of day on the show's date; offer the show's own start as the default.
     const showStartOfDay = decomposeDateTime(showData.show.time).secondsOfDay;
+    const fixed = line?.absolute_time != null;
 
     const lineData = await dynamicPrompt({
-        title: "Add Scenario Line",
-        confirmText: "Add Line",
+        title: options.title,
+        confirmText: options.confirmText,
         elements: [
-            { type: "input-label", id: "lineName", label: "Cue name", placeholder: "e.g., Intro Cue" },
-            { type: "time-label", id: "duration", label: "Duration", config: { mode: "duration" }, value: 60 },
+            { type: "input-label", id: "lineName", label: "Cue name", placeholder: "e.g., Intro Cue", value: line?.name },
+            { type: "time-label", id: "duration", label: "Duration", config: { mode: "duration" }, value: line?.duration ?? 60 },
             {
-                type: "choice-label", id: "startMode", label: "Starts", value: "follow",
+                type: "choice-label", id: "startMode", label: "Starts", value: fixed ? "absolute" : "follow",
                 config: { options: [{ value: "follow", label: "After the previous cue" }, { value: "absolute", label: "At a fixed time" }] },
                 events: {
                     change: (event: Event) => {
@@ -278,8 +301,12 @@ async function addLine(): Promise<void> {
                     }
                 }
             },
-            { type: "time-label", id: "startTime", label: "Start time", config: { mode: "clock" }, value: showStartOfDay, style: { display: "none" } },
-            { type: "textarea-label", id: "lineContent", label: "Cue description", placeholder: "Enter cue description...", rows: 3 }
+            {
+                type: "time-label", id: "startTime", label: "Start time", config: { mode: "clock" },
+                value: fixed ? decomposeDateTime(line!.absolute_time!).secondsOfDay : showStartOfDay,
+                style: fixed ? {} : { display: "none" }
+            },
+            { type: "textarea-label", id: "lineContent", label: "Cue description", placeholder: "Enter cue description...", rows: 3, value: line?.note.trim() }
         ],
         onValidate: data => {
             const errors: Record<string, string> = {};
@@ -290,27 +317,82 @@ async function addLine(): Promise<void> {
             return errors;
         }
     });
+    if (!lineData) return null;
 
-    if (!lineData) return;
-
-    const duration = Number(lineData.duration);
-
-    let absoluteStartTimestamp: number | null = null;
+    let absoluteTime: number | null = null;
     if (lineData.startMode === "absolute") {
         const { date } = decomposeDateTime(showData.show.time);
-        absoluteStartTimestamp = composeDateTime(date, Number(lineData.startTime));
+        absoluteTime = composeDateTime(date, Number(lineData.startTime));
     }
+    return {
+        name: String(lineData.lineName),
+        note: String(lineData.lineContent ?? "").trim(),
+        duration: Number(lineData.duration),
+        absoluteTime
+    };
+}
 
-    const lineComment = String(lineData.lineContent ?? "").trim() === "" ? " " : String(lineData.lineContent);
+/** Name and start time of the show; saves only what changed so a simultaneous edit by someone else survives. */
+async function editShowDetails(): Promise<void> {
+    const showData = requireShowData();
+    const { show } = showData;
+    const form = await dynamicPrompt({
+        title: "Edit Show",
+        confirmText: "Save",
+        elements: [
+            { type: "input-label", id: "showName", label: "Show name", value: show.name },
+            { type: "datetime-label", id: "showTime", label: "Show time", value: show.time }
+        ],
+        onValidate: data => {
+            const errors: Record<string, string> = {};
+            if (!String(data.showName).trim()) errors.showName = "Please fill in a name";
+            if (!Number(data.showTime)) errors.showTime = "A start time must be selected";
+            return errors;
+        }
+    });
+    if (!form) return;
 
+    const changes: ShowEdit = {};
+    const name = String(form.showName).trim();
+    if (name !== show.name) changes.name = name;
+    if (Number(form.showTime) !== show.time) changes.time = Number(form.showTime);
+    if (Object.keys(changes).length === 0) return;
+
+    await getApi().data.editShow(requireShowId(), changes);
+    await refreshShowData();
+    // The list behind the editor shows the name and time too.
+    getApi().bus.emitExternal(requireShowId());
+}
+
+async function addLine(): Promise<void> {
+    const showData = requireShowData();
+    const form = await promptLine(showData, { title: "Add Scenario Line", confirmText: "Add Line" });
+    if (!form) return;
     await getApi().data.addLine({
         showId: requireShowId(),
-        after: lastLine?.id ?? null,
-        lineName: String(lineData.lineName),
-        lineNote: lineComment,
-        duration,
-        absoluteTime: absoluteStartTimestamp
+        after: showData.lines[showData.lines.length - 1]?.id ?? null,
+        lineName: form.name,
+        lineNote: form.note,
+        duration: form.duration,
+        absoluteTime: form.absoluteTime
     });
+    await refreshShowData();
+}
+
+async function editLine(lineId: string): Promise<void> {
+    const showData = requireShowData();
+    const line = showData.lines.find(candidate => candidate.id === lineId);
+    if (!line) return;
+    const form = await promptLine(showData, { title: "Edit Scenario Line", confirmText: "Save", line });
+    if (!form) return;
+    // Only what changed is sent, so a simultaneous edit of another field by someone else survives.
+    const changes: LineEdit = {};
+    if (form.name !== line.name) changes.name = form.name;
+    if (form.note !== line.note.trim()) changes.note = form.note;
+    if (form.duration !== line.duration) changes.duration = form.duration;
+    if (form.absoluteTime !== line.absolute_time) changes.absoluteTime = form.absoluteTime;
+    if (Object.keys(changes).length === 0) return;
+    await getApi().data.editLine(requireShowId(), lineId, changes);
     await refreshShowData();
 }
 

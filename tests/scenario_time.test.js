@@ -106,6 +106,15 @@ test("the editor only offers what the member's role allows", () => {
     const count = (list, name) => list.filter(icon => icon === name).length;
     const lines = data.lines.length;
 
+    const editIcons = role => editShow.buildEditShowLayout({ ...data, show: { ...data.show, role } })
+        .filter(item => item.file === "icons/edit.svg");
+    assert.ok(editIcons("owner").every(item => typeof item.events?.click === "function"), "the edit icon does something");
+    assert.equal(editIcons("owner").length, lines + 1, "one per cue, plus the one for the show's details");
+    assert.equal(editIcons("editor").length, lines + 1);
+    assert.equal(editIcons("commenter").length + editIcons("viewer").length, 0);
+    const showEdit = editIcons("owner").find(item => item.attributes?.title === "Edit show details");
+    assert.equal(typeof showEdit.events.click, "function");
+
     const owner = icons("owner");
     assert.equal(count(owner, "add"), 2 + lines, "add role, add line, and an add-note per line");
     assert.equal(count(owner, "delete"), lines);
@@ -122,4 +131,45 @@ test("the editor only offers what the member's role allows", () => {
     const viewer = icons("viewer");
     assert.equal(count(viewer, "add") + count(viewer, "delete") + count(viewer, "edit"), 0);
     assert.ok(viewer.includes("share"), "everyone can see who has access");
+});
+
+test("the show details dialog starts from the show and saves only what changed", async () => {
+    const edits = [];
+    const emitted = [];
+    let loads = 0;
+    installApi({
+        bus: { emitExternal: (...args) => emitted.push(args) },
+        data: {
+            subscribe: () => () => {},
+            getShowDetails: async () => { loads++; return data; },
+            editShow: async (showId, changes) => edits.push([showId, changes])
+        }
+    });
+    await editShow.openEditShow("show-7");
+    const click = editShow.buildEditShowLayout(data).find(item => item.attributes?.title === "Edit show details").events.click;
+
+    let asked;
+    globalThis.__dynamicPrompt = async options => { asked = options; return { showName: "Renamed show", showTime: String(data.show.time) }; };
+    const before = loads;
+    await click();
+    assert.equal(asked.title, "Edit Show");
+    const fields = Object.fromEntries(asked.elements.map(element => [element.id, element]));
+    assert.deepEqual([fields.showName.value, fields.showTime.value, fields.showTime.type], ["Test show", data.show.time, "datetime-label"]);
+    assert.deepEqual(edits, [["show-7", { name: "Renamed show" }]], "the unchanged time is not sent");
+    assert.equal(loads, before + 1, "the editor reloads after saving");
+    assert.deepEqual(emitted, [["show-7"]], "the show list behind it is told too");
+    assert.deepEqual(asked.onValidate({ showName: "  ", showTime: "0" }), { showName: "Please fill in a name", showTime: "A start time must be selected" });
+    assert.deepEqual(asked.onValidate({ showName: "ok", showTime: "5" }), {});
+
+    // Nothing changed, or the dialog was cancelled: nothing is sent.
+    globalThis.__dynamicPrompt = async () => ({ showName: "Test show", showTime: String(data.show.time) });
+    await click();
+    globalThis.__dynamicPrompt = async () => null;
+    await click();
+    assert.equal(edits.length, 1);
+
+    // A new time is sent as epoch seconds, trimmed name included.
+    globalThis.__dynamicPrompt = async () => ({ showName: "  Test show  ", showTime: String(data.show.time + 3600) });
+    await click();
+    assert.deepEqual(edits.at(-1), ["show-7", { time: data.show.time + 3600 }]);
 });
