@@ -1,9 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { addHoverBox, dynamicGenerator, generateDynamic } from "/shared/js/dynamic_generator";
+import { detectPlatform } from "/shared/js/platform";
 import { SessionSocket } from "/shared/js/session_socket";
 import type { SessionState } from "/shared/js/session_types";
-import type { ScenarioLine, ShowDetails } from "/shared/js/show_types";
+import { compareLines, sortCommentsByRole, type ScenarioLine, type ShowDetails } from "/shared/js/show_types";
 import { startTimers } from "./timers";
 
 const ws = new SessionSocket();
@@ -22,9 +23,16 @@ const elemItemCounter = requireElement("itemCounter");
 const btnNextCue = requireElement("btnNextCue");
 const btnPreviousCue = requireElement("previousCue");
 
+// Sharing (QR) and window fullscreen only exist where the platform provides them.
+const profile = await detectPlatform();
+
 function addActionButtons(): void {
-    dynamicGenerator({ type: "svg", file: "icons/share.svg", events: { click: share }, classes: ["btn", "icon-btn"], style: { width: "24px", height: "24px" } }, "#actionBtnContainer");
-    dynamicGenerator({ type: "svg", file: "icons/fullScreen.svg", events: { click: toggleFullscreen }, classes: ["btn", "icon-btn"], style: { width: "24px", height: "24px", marginLeft: "5px" } }, "#actionBtnContainer");
+    if (profile.features.qrShare) {
+        dynamicGenerator({ type: "svg", file: "icons/share.svg", events: { click: share }, classes: ["btn", "icon-btn"], style: { width: "24px", height: "24px" } }, "#actionBtnContainer");
+    }
+    if (profile.features.fullscreenWindow) {
+        dynamicGenerator({ type: "svg", file: "icons/fullScreen.svg", events: { click: toggleFullscreen }, classes: ["btn", "icon-btn"], style: { width: "24px", height: "24px", marginLeft: "5px" } }, "#actionBtnContainer");
+    }
 }
 
 // Module scripts are deferred, so the DOM may already be parsed by now.
@@ -54,7 +62,7 @@ ws.on("cue_change", ({ current_cue, next_cue, show_started_at, cue_started_at })
         if (badge) badge.textContent = "pending";
     });
 
-    const sorted = [...showData.lines].sort((a, b) => a.order - b.order);
+    const sorted = [...showData.lines].sort(compareLines);
     const activeId = sorted[current_cue - 1]?.id;
     const nextId = next_cue == null ? undefined : sorted[next_cue - 1]?.id;
 
@@ -111,11 +119,11 @@ ws.on("get_show_data", data => {
     renderCueNotes();
     elemItemCounter.innerText = `${show.lines.length} Items`;
 
-    show.lines.forEach(line => {
+    show.lines.forEach((line, index) => {
         generateDynamic([
-            { type: "div", classes: "cue-card", data: { lineId: line.id }, style: { cursor: "pointer" }, events: { click: () => jumpToCue(line.id) }, varId: "wrapper" },
+            { type: "div", classes: "cue-card", data: { lineId: line.id }, style: { cursor: "pointer" }, events: { click: () => jumpToCue(index + 1) }, varId: "wrapper" },
             { type: "div", classes: "cue-info", target: "@wrapper", varId: "infoSection" },
-            { type: "span", classes: "cue-title", text: `Cue ${line.id}: ${line.name}`, target: "@infoSection" },
+            { type: "span", classes: "cue-title", text: `Cue ${index + 1}: ${line.name}`, target: "@infoSection" },
             { type: "span", classes: "cue-time", text: `Duration: ${line.duration}s`, target: "@infoSection" },
             { type: "span", text: "pending", style: { color: "var(--text-muted)", fontSize: "0.8rem" }, target: "@wrapper" }
         ], "#cueList");
@@ -143,7 +151,7 @@ ws.on("join_session", ({ command: _command, ...user }) => {
     addUserToElem(user.client_role, user.client_name);
 });
 
-function addUserToElem(roleId: number | null, userName: string | null): void {
+function addUserToElem(roleId: string | null, userName: string | null): void {
     const elem = document.querySelector<HTMLElement>(`.role-user[data-role-id="${roleId}"]`);
     if (!elem) return;
 
@@ -157,7 +165,7 @@ function addUserToElem(roleId: number | null, userName: string | null): void {
 function renderCueNotes(): void {
     if (!showData) return;
 
-    const lines = [...showData.lines].sort((a, b) => a.order - b.order);
+    const lines = [...showData.lines].sort(compareLines);
     const currentCue = sessionData?.current_cue;
     const currentIndex = Number.isInteger(currentCue) && currentCue! > 0 ? currentCue! - 1 : -1;
 
@@ -172,7 +180,7 @@ function renderCueNoteCard(kind: "active" | "next", line: ScenarioLine | null): 
     const notes = document.getElementById(`${prefix}CueNotes`);
     if (!number || !title || !notes || !showData) return;
 
-    number.textContent = line ? `Cue ${line.id}` : "—";
+    number.textContent = line ? `Cue ${showData.lines.slice().sort(compareLines).findIndex(l => l.id === line.id) + 1}` : "—";
     title.textContent = line ? line.name : kind === "active" ? "Waiting for cue" : "No upcoming cue";
     notes.replaceChildren();
 
@@ -181,16 +189,16 @@ function renderCueNoteCard(kind: "active" | "next", line: ScenarioLine | null): 
         return;
     }
 
-    const lineComment = line.comment?.trim();
+    const lineComment = line.note?.trim();
     if (lineComment) {
         dynamicGenerator({ type: "div", classes: "note-line-comment", text: lineComment }, notes);
     }
 
     const comments = (showData.comments || [])
-        .filter(comment => comment.line_id === line.id)
-        .sort((a, b) => (a.role_id ?? -1) - (b.role_id ?? -1));
+        .filter(comment => comment.line_id === line.id);
+    const orderedComments = sortCommentsByRole(comments, showData.roles);
 
-    comments.forEach(comment => {
+    orderedComments.forEach(comment => {
         const roleName = comment.role_id == null
             ? "General"
             : showData?.roles.find(role => role.id === comment.role_id)?.name || "Role";
@@ -209,8 +217,8 @@ function renderCueNoteCard(kind: "active" | "next", line: ScenarioLine | null): 
 btnNextCue.addEventListener("click", () => ws.emit("next_cue"));
 btnPreviousCue.addEventListener("click", () => ws.emit("previous_cue"));
 
-function jumpToCue(cueId: number): void {
-    ws.emit("jump_to_cue", { cue_number: cueId });
+function jumpToCue(cueNumber: number): void {
+    ws.emit("jump_to_cue", { cue_number: cueNumber });
 }
 
 //************************

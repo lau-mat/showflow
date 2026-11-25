@@ -31,6 +31,8 @@ export interface ElementDefinition {
     value?: string | number;
     rows?: number;
     options?: ElementDefinition[];
+    /** Settings for compound components registered with `registerCompound`. */
+    config?: Record<string, unknown>;
 }
 
 export interface BoxOptions {
@@ -80,7 +82,22 @@ function resolveElement(elem: ElementTarget): GeneratedElement {
     return element;
 }
 
+/** Builds the contents of a compound's `.form-group` (usually a label plus its controls). */
+export type CompoundBuilder = (definition: ElementDefinition) => ElementDefinition[];
+const compounds = new Map<string, CompoundBuilder>();
+
+/**
+ * Adds a compound element type next to the built-in `input-label` / `select-label` /
+ * `textarea-label`. A compound is a `.form-group` holding a label and whatever its builder
+ * returns; to take part in `dynamicPrompt` it keeps its value in an `input[id]`.
+ */
+function registerCompound(type: string, builder: CompoundBuilder): void {
+    compounds.set(type, builder);
+}
+
 function compoundChildren(definition: ElementDefinition): ElementDefinition[] | null {
+    const custom = compounds.get(definition.type);
+    if (custom) return custom(definition);
     const label: ElementDefinition = {
         type: "label",
         attributes: { for: definition.id },
@@ -675,6 +692,7 @@ function addHoverBox(id: string | null, title: string, content: ElementDefinitio
 }
 
 export {
+    registerCompound,
     addHoverBox,
     boxes,
     dynamicPrompt,

@@ -1,277 +1,106 @@
+mod auth_store;
 mod db;
+mod platform;
 mod session;
+mod store;
+mod sync_store;
 
 use std::sync::{Arc, Mutex};
 use tauri::{State, Manager, Emitter};
 use tauri_plugin_opener;
-use serde::{Serialize, Deserialize};
-use rusqlite::Connection;
+use protocol::show::{MemberRole, ScenarioLine, ScenarioLineComment, Show, ShowDetails, ShowRole};
+use protocol::sync::{EntityKind, OpKind, Place};
+use serde_json::json;
+use uuid::Uuid;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Show {
-    pub id: i64,
-    pub name: String,
-    pub time: i64,
-}
+use store::{apply_local, new_op};
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ShowRole {
-    pub id: i64,
-    pub show_id: i64,
-    pub name: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ScenarioLineComment {
-    pub id: i64,
-    pub line_id: i64,
-    pub role_id: Option<i64>, // Nullable foreign key
-    pub comment: String
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ScenarioLine {
-    pub id: i64,
-    pub order: i64,
-    pub name: String,
-    pub comment: String,
-    pub duration: i64,
-    pub absolute_time: Option<i64>
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ShowDetails {
-    pub show: Show,
-    pub roles: Vec<ShowRole>,
-    pub lines: Vec<ScenarioLine>,
-    pub comments: Vec<ScenarioLineComment>,
-}
-
-pub fn fetch_show_details(db: &Arc<Mutex<Connection>>, show_id: i64) -> Result<ShowDetails, String> {
-    let conn = db.lock().map_err(|e| e.to_string())?;
-
-    // 1. Fetch the main Show
-    let show = conn.query_row(
-        "SELECT show_name, show_time FROM shows WHERE show_id = ?1",
-        [show_id],
-        |row| {
-            Ok(Show {
-                id: show_id,
-                name: row.get(0)?,
-                time: row.get(1)?,
-            })
-        },
-    ).map_err(|e| format!("Show not found: {}", e))?;
-
-    // 2. Fetch Roles for this show
-    let mut roles_stmt = conn
-        .prepare("SELECT role_id, show_id, role_name FROM show_roles WHERE show_id = ?1")
-        .map_err(|e| e.to_string())?;
-    
-    let roles = roles_stmt
-        .query_map([show_id], |row| {
-            Ok(ShowRole {
-                id: row.get(0)?,
-                show_id: row.get(1)?,
-                name: row.get(2)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-
-    // 3. Fetch Scenario Lines for this show
-    let mut lines_stmt = conn
-        .prepare("SELECT scenario_line_id, scenario_line_order, scenario_line_name, scenario_line_note, scenario_line_duration, scenario_line_absolute_time FROM show_scenario_line WHERE show_id = ?1 ORDER BY scenario_line_order ASC")
-        .map_err(|e| e.to_string())?;
-
-    let lines = lines_stmt
-        .query_map([show_id], |row| {
-            Ok(ScenarioLine {
-                id: row.get(0)?,
-                order: row.get(1)?,
-                name: row.get(2)?,
-                comment: row.get(3)?,
-                duration: row.get(4)?,
-                absolute_time: row.get(5)?,
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-
-    // 4. Fetch Comments for lines in this show
-    let mut comments_stmt = conn
-        .prepare(
-            "SELECT c.id, c.line_id, c.role_id, c.comment 
-            FROM show_scenario_line_comment c
-            JOIN show_scenario_line l ON c.line_id = l.scenario_line_id
-            WHERE l.show_id = ?1"
-        )
-        .map_err(|e| e.to_string())?;
-
-    let comments = comments_stmt
-        .query_map([show_id], |row| {
-            Ok(ScenarioLineComment {
-                id: row.get(0)?,
-                line_id: row.get(1)?,
-                role_id: row.get(2)?,
-                comment: row.get(3)?
-            })
-        })
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
-
-    Ok(ShowDetails {
-        show,
-        roles,
-        lines,
-        comments,
-    })
+fn parse_id(id: &str) -> Result<Uuid, String> {
+    Uuid::parse_str(id).map_err(|_| format!("Invalid id: {id}"))
 }
 
 #[tauri::command]
 fn new_show(state: State<'_, db::DbState>, name: &str, time: i64) -> Result<Show, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-
-    conn.execute(
-        "INSERT INTO shows (show_name, show_time) VALUES (?1, ?2)",
-        rusqlite::params![name, time],
-    ).map_err(|e| e.to_string())?;
-
-    let id = conn.last_insert_rowid();
-
-    let show = Show {
-        id,
-        name: name.to_string(),
-        time: time,
-    };
-    println!("New show created: {} at {}", show.name, show.time);
-    Ok(show)
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    let id = Uuid::new_v4();
+    apply_local(&mut conn, &id.to_string(), new_op(EntityKind::Show, id, OpKind::Set, json!({ "name": name, "time": time })))?;
+    Ok(Show { id: id.to_string(), name: name.to_string(), time, role: MemberRole::Owner })
 }
 
 #[tauri::command]
 fn get_shows(state: State<'_, db::DbState>) -> Result<Vec<Show>, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;  
-    let mut stmt = conn.prepare("SELECT show_id, show_name, show_time FROM shows").map_err(|e| e.to_string())?;
-    let show_iter = stmt.query_map([], |row| {
-        Ok(Show {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            time: row.get(2)?,
-        })
-    }).map_err(|e| e.to_string())?;
-
-    let mut shows = Vec::new();
-    for show in show_iter {
-        shows.push(show.map_err(|e| e.to_string())?);
-    }
-    Ok(shows)
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let account = store::current_account(&conn)?;
+    store::list_shows(&conn, account.as_deref())
 }
 
 #[tauri::command]
-fn delete_show(state: State<'_, db::DbState>, id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    conn.execute(
-        "DELETE FROM shows WHERE show_id = ?1",
-        &[&id],
-    ).map_err(|e| e.to_string())?;
-    println!("Show with ID {} deleted", id);
+fn delete_show(state: State<'_, db::DbState>, id: &str) -> Result<(), String> {
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    apply_local(&mut conn, id, new_op(EntityKind::Show, parse_id(id)?, OpKind::Delete, json!({})))?;
     Ok(())
 }
 
 #[tauri::command]
-fn get_full_show_details(state: State<'_, db::DbState>, show_id: i64) -> Result<ShowDetails, String> {
-    let response = fetch_show_details(&state.0, show_id)?;
-    Ok(response)
+fn get_full_show_details(state: State<'_, db::DbState>, show_id: &str) -> Result<ShowDetails, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    store::fetch_show_details(&conn, show_id)
 }
 
 #[tauri::command]
-fn add_role(state: State<'_, db::DbState>, show_id: i64, role_name: &str) -> Result<ShowRole, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-
-    conn.execute(
-        "INSERT INTO show_roles (show_id, role_name) VALUES (?1, ?2)",
-        rusqlite::params![show_id, role_name],
-    ).map_err(|e| e.to_string())?;
-
-    let id = conn.last_insert_rowid();
-
-    let role = ShowRole {
-        id,
-        show_id,
-        name: role_name.to_string(),
-    };
-    println!("New role created: {} for show ID {}", role.name, role.show_id);
-    Ok(role)
+fn add_role(state: State<'_, db::DbState>, show_id: &str, role_name: &str) -> Result<ShowRole, String> {
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    let id = Uuid::new_v4();
+    apply_local(&mut conn, show_id, new_op(EntityKind::Role, id, OpKind::Set, json!({ "name": role_name })))?;
+    Ok(ShowRole { id: id.to_string(), show_id: show_id.to_string(), name: role_name.to_string() })
 }
 
+/// `after` is the line to insert behind (`None`: at the start of the script).
 #[tauri::command]
-fn add_scenario_line(state: State<'_, db::DbState>, show_id: i64, line_order: i64, line_name: &str, line_comment: &str, duration: i64, absolute_time: Option<i64>) -> Result<ScenarioLine, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-
-    conn.execute(
-        "INSERT INTO show_scenario_line (show_id, scenario_line_order, scenario_line_name, scenario_line_note, scenario_line_duration, scenario_line_absolute_time) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        rusqlite::params![show_id, line_order, line_name, line_comment, duration, absolute_time],
-    ).map_err(|e| e.to_string())?;
-
-    let line_id = conn.last_insert_rowid();
-
-    let scenario_line = ScenarioLine {
-        id: line_id,
-        order: line_order,
+fn add_scenario_line(state: State<'_, db::DbState>, show_id: &str, after: Option<String>, line_name: &str, line_note: &str, duration: i64, absolute_time: Option<i64>) -> Result<ScenarioLine, String> {
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    let id = Uuid::new_v4();
+    let mut op = new_op(EntityKind::Line, id, OpKind::Set, json!({
+        "name": line_name, "note": line_note, "duration": duration, "absolute_time": absolute_time
+    }));
+    op.place = Some(Place { after: after.as_deref().map(parse_id).transpose()? });
+    let queued = apply_local(&mut conn, show_id, op)?;
+    Ok(ScenarioLine {
+        id: id.to_string(),
+        position: queued.fields["position"].as_str().unwrap_or_default().to_string(),
         name: line_name.to_string(),
-        comment: line_comment.to_string(),
+        note: line_note.to_string(),
         duration,
         absolute_time,
-    };
-    println!("New scenario line created: {} for show ID {}", scenario_line.name, show_id);
-    Ok(scenario_line)
+    })
 }
 
 #[tauri::command]
-fn delete_scenario_line(state: State<'_, db::DbState>, line_id: i64) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    conn.execute(
-        "DELETE FROM show_scenario_line WHERE scenario_line_id = ?1",
-        rusqlite::params![line_id],
-    ).map_err(|e| e.to_string())?;
-    println!("Scenario line with ID {} deleted", line_id);
+fn delete_scenario_line(state: State<'_, db::DbState>, line_id: &str) -> Result<(), String> {
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    let show_id = store::show_for(&mut conn, EntityKind::Line, line_id)?;
+    apply_local(&mut conn, &show_id, new_op(EntityKind::Line, parse_id(line_id)?, OpKind::Delete, json!({})))?;
     Ok(())
 }
 
 #[tauri::command]
-fn add_scenario_line_comment(state: State<'_, db::DbState>, line_id: i64, role_id: Option<i64>, comment: &str) -> Result<ScenarioLineComment, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-
-    conn.execute(
-        "INSERT INTO show_scenario_line_comment (line_id, role_id, comment) VALUES (?1, ?2, ?3)",
-        rusqlite::params![line_id, role_id, comment],
-    ).map_err(|e| e.to_string())?;
-
-    let comment_id = conn.last_insert_rowid();
-
-    let scenario_line_comment = ScenarioLineComment {
-        id: comment_id,
-        line_id,
-        role_id,
-        comment: comment.to_string()
-    };
-    println!("New comment added to line ID {}: {}", line_id, scenario_line_comment.comment);
-    Ok(scenario_line_comment)
+fn add_scenario_line_comment(state: State<'_, db::DbState>, line_id: &str, role_id: Option<String>, comment: &str) -> Result<ScenarioLineComment, String> {
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    let show_id = store::show_for(&mut conn, EntityKind::Line, line_id)?;
+    let id = Uuid::new_v4();
+    apply_local(&mut conn, &show_id, new_op(EntityKind::Comment, id, OpKind::Set, json!({
+        "line_id": line_id, "role_id": role_id, "comment": comment
+    })))?;
+    Ok(ScenarioLineComment { id: id.to_string(), line_id: line_id.to_string(), role_id, comment: comment.to_string() })
 }
 
 #[tauri::command]
-fn edit_scenario_line_comment(state: State<'_, db::DbState>, comment_id: i64, role_id: Option<i64>, comment: &str) -> Result<(), String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-
-    conn.execute(
-        "UPDATE show_scenario_line_comment SET comment = ?1, role_id = ?2 WHERE id = ?3",
-        rusqlite::params![comment, role_id, comment_id],
-    ).map_err(|e| e.to_string())?;
-
-    println!("Comment with ID {} updated to: {}", comment_id, comment);
+fn edit_scenario_line_comment(state: State<'_, db::DbState>, comment_id: &str, role_id: Option<String>, comment: &str) -> Result<(), String> {
+    let mut conn = state.0.lock().map_err(|e| e.to_string())?;
+    let show_id = store::show_for(&mut conn, EntityKind::Comment, comment_id)?;
+    apply_local(&mut conn, &show_id, new_op(EntityKind::Comment, parse_id(comment_id)?, OpKind::Set, json!({
+        "role_id": role_id, "comment": comment
+    })))?;
     Ok(())
 }
 
@@ -320,7 +149,17 @@ pub fn run() {
             add_scenario_line_comment,
             edit_scenario_line_comment,
             session::start_session,
-            session::generate_server_qr
+            session::generate_server_qr,
+            platform::platform_info,
+            auth_store::auth_load,
+            auth_store::auth_save,
+            auth_store::auth_clear,
+            sync_store::sync_state,
+            sync_store::sync_pending,
+            sync_store::sync_ack,
+            sync_store::sync_apply_changes,
+            sync_store::sync_forget_show,
+            sync_store::sync_adopt_account
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

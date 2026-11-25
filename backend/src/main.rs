@@ -2,7 +2,13 @@ use axum::{routing::get, Router};
 use sqlx::PgPool;
 use std::env;
 
+mod api_error;
 mod auth;
+mod cors;
+mod mail;
+mod sharing;
+mod shows;
+mod sync_stream;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
@@ -32,17 +38,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // *Verification:* Check if migrations applied without error
     println!("Database schema is up to date and ready.");
 
+    // Expired sessions and tokens are harmless (they never validate) but should not pile up.
+    let housekeeping_pool = pool.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(3600));
+        loop {
+            tick.tick().await;
+            if let Err(error) = auth::purge_expired(&housekeeping_pool).await {
+                eprintln!("Housekeeping failed: {error}");
+            }
+        }
+    });
+
     start_server(pool, auth).await?;
     Ok(())
 }
 
 async fn start_server(pool: PgPool, auth: auth::AuthConfig) -> Result<(), std::io::Error> {
+    // One database listener per instance feeds every connected live stream.
+    let state = auth::state(pool.clone(), auth);
+    sync_stream::spawn_listener(pool, state.hub.clone());
+    let origins = cors::parse_origins(env::var("AUTH_ALLOWED_ORIGINS").ok().as_deref());
     let app = Router::new()
         .route("/", get(|| async { "Hello from Showflow Rust Backend!" }))
-        .merge(auth::router(pool, auth));
+        .merge(auth::routes())
+        .merge(shows::routes())
+        .merge(sharing::routes())
+        .merge(sync_stream::routes())
+        .with_state(state)
+        .layer(axum::middleware::from_fn_with_state(origins, cors::layer));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
-    println!("Backend server running on http://localhost:8080");
+    let address = env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_owned());
+    let listener = tokio::net::TcpListener::bind(&address).await?;
+    println!("Backend server running on http://{address}");
 
     axum::serve(listener, app).await
 }

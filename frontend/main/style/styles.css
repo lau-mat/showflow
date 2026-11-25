@@ -2,6 +2,7 @@
    1. Design Tokens
    ========================================================================== */
 @import "/shared/style/colors.css";
+@import "/shared/style/fonts.css";
 
 /* ==========================================================================
    2. Absolute Center Layout
@@ -478,104 +479,164 @@ td.create-show-cell {
 }
 
 /* ==========================================================================
-   Show Editor Fullscreen Interface
+   Show Editor Fullscreen Interface (dense layout)
    ========================================================================== */
 
 .show-editor-container {
   display: flex;
-  gap: 1.5rem;
-  height: 100%;        /* Takes full height of .modal-content */
-  max-height: 100%;    /* Hard cap to prevent window overflow */
+  gap: 0.6rem;
+  height: 100%;
+  max-height: 100%;
   width: 100%;
   min-height: 0;       /* CRITICAL: Allows children to shrink on window resize */
   overflow: hidden;
+  font-size: 0.8rem;
 }
 
-/* Sidebar Styling */
+/* Sidebar */
 .show-editor-sidebar {
-  width: 280px;
+  width: 220px;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.6rem;
   flex-shrink: 0;
+  overflow-y: auto;
 }
 
 .editor-card {
   background-color: var(--surface-color);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  padding: 1.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.6rem 0.7rem;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.5rem;
 }
 
-.editor-card h3 {
-  font-size: 0.95rem;
+.editor-card h3,
+.show-editor-main h3 {
+  font-size: 0.7rem;
   font-weight: 600;
-  color: var(--text-main);
+  color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .card-header-flex {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: 1.5rem;
 }
 
-.show-meta-time {
-  font-size: 0.85rem;
-  color: var(--text-muted);
+.header-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
 }
 
-/* Role Badges */
+/* Compact icon buttons inside the editor */
+.show-editor-container .btn-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  max-width: 1.5rem;
+  max-height: 1.5rem;
+  padding: 0.28rem;
+}
+
+/* Show stats (label / value grid) */
+.stat-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.stat-label { color: var(--text-muted); }
+
+.stat-value {
+  color: var(--text-main);
+  text-align: right;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Roles */
 .role-list {
   list-style: none;
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
 .role-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.15rem 0.2rem 0.15rem 0.5rem;
   background-color: var(--header-bg);
-  border: 1px solid var(--border-light);
-  color: var(--text-main);
-  font-size: 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.role-badge-label {
+  font-size: 0.78rem;
   font-weight: 500;
-  padding: 0.35rem 0.65rem;
-  border-radius: calc(var(--radius) - 4px);
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-msg {
   color: var(--text-muted);
   font-style: italic;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
-/* Main Scenario Area */
+/* Visibility icon inside role badges */
+.btn-role-toggle {
+  border-color: transparent !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-role-toggle path,
+.btn-role-toggle circle,
+.btn-role-toggle line { stroke: var(--text-muted) !important; }
+
+.btn-role-toggle:hover path,
+.btn-role-toggle:hover circle,
+.btn-role-toggle:hover line { stroke: var(--text-main) !important; }
+
+.btn-role-toggle.is-hidden { opacity: 0.35; filter: grayscale(100%); }
+
+/* Run sheet */
 .show-editor-main {
   flex: 1;
   background-color: var(--surface-color);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  padding: 1.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.5rem 0.6rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.4rem;
   min-width: 0;
-  min-height: 0;       /* CRITICAL: Passes height cap down */
-  height: 100%;        /* Forces main panel to respect parent container height */
-  overflow: hidden;    /* Stops main card from scrolling */
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
 .lines-table-wrapper {
   flex: 1;
-  min-height: 0;       /* CRITICAL: Shrinks dynamically as window decreases */
-  overflow-y: auto;    /* ONLY table content scrolls! */
-  border: 1px solid var(--border-light);
-  border-radius: calc(var(--radius) - 2px);
+  min-height: 0;
+  overflow-y: auto;    /* ONLY table content scrolls */
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
   position: relative;
 }
 
@@ -583,103 +644,90 @@ td.create-show-cell {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
+  font-size: 0.8rem;
 }
 
 .lines-table th {
-  position: sticky;
-  top: 0;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
   background-color: var(--header-bg);
-  z-index: 10;
-  box-shadow: 0 1px 0 var(--border-light);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: none;
 }
 
-.lines-table td, 
-.lines-table th {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: middle;
+.lines-table td {
+  padding: 0.3rem 0.6rem;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border-color);
 }
+
+.lines-table tbody tr:hover { background-color: var(--row-hover); }
 
 .line-number-cell {
-  font-weight: 700;
-  vertical-align: top;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2 !important;
 }
 
 .line-number-cell .startTime {
+  font-weight: 600;
   color: var(--accent-color);
 }
 
-.line-content-cell {
-  white-space: normal;
-  word-break: break-word;
-  line-height: 1.4;
-  vertical-align: top;
+.line-number-cell .duration {
+  font-size: 0.7rem;
+  color: var(--text-muted);
 }
 
-/* Inline Comment Bubbles */
-.line-comments-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding-right: 0.25rem;
+.line-content-cell { font-weight: 600; }
+
+.line-note-cell {
+  color: var(--text-muted);
+  white-space: pre-wrap !important;
 }
 
-.line-action-cell-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start; /* or center, depending on your layout preference */
-  gap: 0.5rem; /* Controls the exact spacing between all action buttons */
-}
+/* Inline comment chips */
+.line-comments-cell { display: table-cell; }
+.line-comments-cell > * + * { margin-top: 0.2rem; }
 
 .comment-bubble {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.25rem;
-  padding: 0.4rem 0.6rem;
-  background-color: var(--card-bg, #1e1e24);
-  border: 1px solid var(--border-color, #2d2d35);
-  border-radius: var(--radius, 6px);
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.12rem 0.4rem;
+  background-color: var(--header-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
   width: 100%;
-  
-  /* FIXED: Allow natural height expansion without clipping */
-  height: auto;
-  min-height: min-content;
-  max-height: 1000px; /* High safety ceiling for CSS height transitions */
-  overflow: visible;  /* Prevents font descenders/last lines from cutting off */
   box-sizing: border-box;
-  
+  max-height: 1000px;
   transition: max-height 0.25s ease-in-out, opacity 0.2s ease-in-out, padding 0.2s ease-in-out, margin 0.2s ease-in-out;
   opacity: 1;
 }
 
+.comment-bubble:hover { border-color: var(--accent-color); }
+
 .comment-role-tag {
-  display: inline-block;
-  font-size: 0.7rem;
-  font-weight: 600;
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--text-muted, #8a8a93);
-  background: var(--header-bg, #282830);
-  padding: 0.15rem 0.4rem;
-  border-radius: 4px;
-  line-height: 1.2;
-  flex-shrink: 0; /* Prevents tag from squishing when text grows */
+  letter-spacing: 0.05em;
+  color: var(--accent-color);
 }
 
 .comment-body-text {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--text-main, #e1e1e6);
-  line-height: 1.4;
-  width: 100%;
-  
+  font-size: 0.78rem;
+  color: var(--text-main);
+  line-height: 1.3;
   white-space: pre-wrap;
-  word-break: break-word;
   overflow-wrap: anywhere;
-  
-  /* FIXED: Tiny bottom padding cushion ensures multi-line descenders ('g', 'p', 'y') don't collide with table boundaries */
-  padding-bottom: 2px;
 }
 
 .role-comment-hidden {
@@ -690,28 +738,22 @@ td.create-show-cell {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
   border: none !important;
-  overflow: hidden !important; /* ONLY hide overflow when explicitly hidden */
+  overflow: hidden !important;
   pointer-events: none;
 }
 
-.btn-text-action {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  align-self: flex-start;
-  padding: 0.2rem 0;
-}
+.line-action-cell { text-align: right; }
 
-.btn-text-action:hover {
-  color: var(--accent-color);
+.line-action-cell-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
 }
 
 .empty-table-cell {
   text-align: center;
-  padding: 3rem 1rem !important;
+  padding: 2rem 1rem !important;
   color: var(--text-muted);
 }
 
@@ -721,67 +763,6 @@ td.create-show-cell {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-}
-
-.role-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.35rem 0.6rem;
-  background-color: var(--header-bg);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  transition: all 0.2s ease;
-}
-
-.role-badge-label {
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--text-main);
-}
-
-/* Visibility Icon Button inside Role Badges */
-.btn-role-toggle {
-  width: 1.3rem;
-  height: 1.3rem;
-  min-width: 1.3rem;
-  min-height: 1.3rem;
-  padding: 0.15rem;
-  opacity: 0.9;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-role-toggle path,
-.btn-role-toggle circle,
-.btn-role-toggle line {
-  stroke: var(--text-muted) !important;
-}
-
-.btn-role-toggle:hover path,
-.btn-role-toggle:hover circle,
-.btn-role-toggle:hover line {
-  stroke: var(--text-main) !important;
-}
-
-/* Hidden State (When toggled off) */
-.btn-role-toggle.is-hidden {
-  opacity: 0.35;
-  filter: grayscale(100%);
-}
-
-.btn-role-toggle.is-hidden path,
-.btn-role-toggle.is-hidden circle,
-.btn-role-toggle.is-hidden line {
-  stroke: var(--text-muted) !important;
-  stroke-dasharray: 2 2; /* Optional visual indicator for hidden */
-}
-
-.header-actions-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem; /* Keeps icons neatly bundled together */
 }
 
 @keyframes green-pulse {
@@ -798,4 +779,118 @@ td.create-show-cell {
 .session-active {
   animation: green-pulse 2.5s infinite ease-in-out;
   transition: all 0.3s ease;
+}
+
+/* ==========================================================================
+   Auth forms & account box
+   ========================================================================== */
+.auth-link {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  user-select: auto;
+}
+
+.auth-link:hover { color: var(--accent-color); }
+
+.account-menu {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sync-badge {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.sync-badge[data-phase="offline"] { color: var(--accent-color); }
+.sync-badge[data-phase="error"] { color: var(--error-color); }
+
+.account-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.9rem 1rem;
+  font-size: 0.85rem;
+}
+
+.account-body h3 {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.account-body h3:first-child {
+  font-size: 1rem;
+  color: var(--text-main);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.account-email { color: var(--text-muted); font-size: 0.8rem; }
+
+.device-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.device-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.2rem 0.2rem 0.2rem 0.6rem;
+  background-color: var(--header-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.device-name { flex: 1; font-weight: 500; }
+.device-seen { color: var(--text-muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.device-row .btn-icon { width: 1.5rem; height: 1.5rem; min-width: 1.5rem; min-height: 1.5rem; max-width: 1.5rem; max-height: 1.5rem; padding: 0.28rem; }
+
+.role-tag {
+  margin-left: 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.role-select {
+  background-color: var(--surface-color);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.4rem;
+}
+
+.invite-link-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.invite-link-row input {
+  flex: 1;
+  min-width: 0;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.5rem;
+  user-select: text;
 }

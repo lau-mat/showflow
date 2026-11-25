@@ -29,6 +29,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - RUST_LOG=debug
       - AUTH_JWT_SECRET=${AUTH_JWT_SECRET:?Set AUTH_JWT_SECRET to a random secret of at least 32 bytes}
+      # Plain-http local gateway: browsers drop Secure cookies there. Remove behind https.
+      - AUTH_COOKIE_INSECURE=1
     depends_on:
       - postgres
       - redis
@@ -58,6 +60,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
       - backend
+      - webapp
       # - backend-2
     restart: unless-stopped
 

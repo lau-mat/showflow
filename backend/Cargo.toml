@@ -11,13 +11,14 @@ sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-rustls", "postgres
 dotenvy = { version = "0.15" }
 argon2 = "0.5"
 base64 = "0.22"
+futures-util = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
 jsonwebtoken = "9.3"
 rand = "0.8"
+serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 sha2 = "0.10"
 uuid = { version = "1", features = ["serde", "v4"] }
 
 [dev-dependencies]
-serde_json = "1.0"
 tower = { version = "0.5", features = ["util"] }

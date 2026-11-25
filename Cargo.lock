@@ -3478,6 +3478,8 @@ name = "protocol"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
+ "uuid",
 ]
 
 [[package]]
@@ -4236,6 +4238,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "dotenvy",
+ "futures-util",
  "jsonwebtoken",
  "protocol",
  "rand 0.8.8",

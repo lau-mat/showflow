@@ -4,12 +4,12 @@ import type { ShowDetails } from "./show_types";
 export interface SessionClient {
     client_id: string;
     client_name: string | null;
-    client_role: number | null;
+    client_role: string | null;
 }
 
 export interface SessionState {
     session_id: string;
-    show_id: number;
+    show_id: string;
     is_active: boolean;
     current_cue: number | null;
     show_started_at: number | null;
@@ -19,7 +19,7 @@ export interface SessionState {
 
 /** Messages the server sends, keyed by their `command` tag (ServerMessage). */
 export interface ServerMessages {
-    join_session: { client_id: string; client_name: string; client_role: number };
+    join_session: { client_id: string; client_name: string; client_role: string };
     get_show_data: { data: ShowDetails };
     get_session_data: { session: SessionState };
     cue_change: {
@@ -33,7 +33,7 @@ export interface ServerMessages {
 
 /** Messages a client sends, keyed by their `command` tag (ClientMessage). */
 export interface ClientMessages {
-    join_session: { user_name: string; role_id: number | null };
+    join_session: { user_name: string; role_id: string | null };
     get_show_data: Record<string, never>;
     get_session_data: Record<string, never>;
     next_cue: Record<string, never>;

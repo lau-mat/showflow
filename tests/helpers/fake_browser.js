@@ -38,16 +38,17 @@ export function installFakeBrowser() {
 }
 
 export const show = {
-    show: { id: 1, name: "Gala", time: 1_800_000_000 },
-    roles: [{ id: 7, show_id: 1, name: "Sound" }],
+    show: { id: "show-1", name: "Gala", time: 1_800_000_000, role: "owner" },
+    roles: [{ id: "7", show_id: "show-1", name: "Sound" }],
     lines: [
-        { id: 1, order: 1, name: "Opening", comment: "", duration: 60, absolute_time: null },
-        { id: 2, order: 2, name: "Speech", comment: "", duration: 120, absolute_time: null }
+        { id: "line-1", position: "a", name: "Opening", note: "", duration: 60, absolute_time: null },
+        { id: "line-2", position: "b", name: "Speech", note: "", duration: 120, absolute_time: null }
     ],
-    comments: []
+    comments: [],
+    rev: 0
 };
 
 export const sessionState = (joined_users = []) => ({
-    session_id: "s", show_id: 1, is_active: true, current_cue: null,
+    session_id: "s", show_id: "show-1", is_active: true, current_cue: null,
     show_started_at: null, cue_started_at: null, joined_users
 });

@@ -6,10 +6,12 @@ export default defineConfig({
   root: './frontend/main',
   server: {
     proxy: {
+      // The docker gateway (:8080) serves the API under /api, so the prefix is kept. API_PROXY_TARGET
+      // points at a backend reached directly (`cargo run`), which has no /api prefix: strip it.
       '/api': {
-        target: 'http://127.0.0.1:8080',
+        target: process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8080',
         changeOrigin: true,
-        rewrite: path => path.replace(/^\/api/, ''),
+        ...(process.env.API_PROXY_TARGET ? { rewrite: path => path.replace(/^\/api/, '') } : {}),
       },
     },
   },

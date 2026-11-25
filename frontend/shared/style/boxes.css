@@ -54,7 +54,7 @@
 
 /* Header Section */
 .modal-header {
-  padding: .6rem 1.25rem;
+  padding: .4rem 1rem;
   border-bottom: 1px solid var(--border-color, #2e2e35);
   background-color: var(--header-bg, #27272d);
   display: flex;
@@ -63,7 +63,7 @@
 }
 
 .modal-header h2 {
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-main, #f4f4f6);
 }
@@ -103,10 +103,12 @@
 
 .dialog-box.fullscreen .modal-content {
   overflow: hidden !important; /* Disables whole-dialog scrolling */
-  height: calc(100vh - 45px) !important; /* Locks full height shell */
+  height: auto !important;
+  flex: 1;             /* Fills what the header leaves */
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 1.25rem;
+  padding: 0.6rem;
   box-sizing: border-box;
 }
 
@@ -236,3 +238,213 @@
   display: flex;
   flex-direction: column;
 }
+/* ==========================================================================
+   Compound time components (compound_components.ts): time-label, datetime-label, choice-label
+   ========================================================================== */
+.time-field,
+.datetime-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background-color: var(--bg-color, #19191c);
+  border: 1px solid var(--border-color, #2e2e35);
+  border-radius: calc(var(--radius, 10px) - 2px);
+  padding: 0.6rem 0.75rem;
+  transition: border-color 0.15s ease;
+}
+
+.time-field:focus-within,
+.datetime-picker:focus-within { border-color: var(--accent-color, #f59e0b); }
+
+/* A failed validation outlines the whole component (the hidden value carries the error). */
+.time-value.invalid ~ .time-field,
+.time-value.invalid ~ .datetime-picker,
+.time-value.invalid ~ .choice-group { border-color: var(--error-color, #f87171); }
+
+/* Inside a picker the dial needs no frame of its own. */
+.datetime-picker .time-field { background: none; border: none; padding: 0; }
+
+.time-segs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+}
+
+.time-seg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.time-colon {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-muted, #93939e);
+  padding: 0 0.1rem;
+}
+
+.modal-content .seg-input {
+  width: 3.4rem;
+  padding: 0.3rem 0;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background-color: var(--surface-color, #212126);
+}
+
+.seg-btn,
+.cal-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 1.3rem;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted, #93939e);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.cal-nav { width: 1.8rem; height: 1.8rem; }
+
+.seg-btn:hover,
+.cal-nav:hover {
+  background-color: var(--row-hover, #28282f);
+  color: var(--accent-color, #f59e0b);
+}
+
+.chev { width: 0.95rem; height: 0.95rem; }
+.chev-up { transform: rotate(180deg); }
+.chev-left { transform: rotate(90deg); }
+.chev-right { transform: rotate(-90deg); }
+
+.time-presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.chip {
+  padding: 0.18rem 0.6rem;
+  background-color: var(--header-bg, #27272d);
+  border: 1px solid var(--border-color, #2e2e35);
+  border-radius: 999px;
+  color: var(--text-muted, #93939e);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.chip:hover {
+  border-color: var(--accent-color, #f59e0b);
+  color: var(--text-main, #f4f4f6);
+}
+
+/* Calendar */
+.cal { display: flex; flex-direction: column; gap: 0.35rem; }
+
+.cal-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.cal-title {
+  flex: 1;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--text-main, #f4f4f6);
+}
+
+.cal-weekdays,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.15rem;
+}
+
+.cal-weekdays span {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted, #93939e);
+}
+
+.cal-day {
+  height: 2rem;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-main, #f4f4f6);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.cal-day:hover { background-color: var(--row-hover, #28282f); }
+.cal-day.is-outside { color: var(--text-muted, #93939e); opacity: 0.45; }
+.cal-day.is-today { border-color: var(--border-color, #2e2e35); font-weight: 700; }
+
+.cal-day.is-selected {
+  background-color: var(--accent-color, #f59e0b);
+  border-color: var(--accent-color, #f59e0b);
+  color: var(--bg-color, #19191c);
+  font-weight: 700;
+  opacity: 1;
+}
+
+.datetime-summary {
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--accent-color, #f59e0b);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Segmented choice */
+.choice-group {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  background-color: var(--bg-color, #19191c);
+  border: 1px solid var(--border-color, #2e2e35);
+  border-radius: calc(var(--radius, 10px) - 2px);
+}
+
+.choice-btn {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  background: none;
+  border: none;
+  border-radius: calc(var(--radius, 10px) - 5px);
+  color: var(--text-muted, #93939e);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.choice-btn:hover { color: var(--text-main, #f4f4f6); }
+
+.choice-btn.is-active {
+  background-color: var(--header-bg, #27272d);
+  color: var(--accent-color, #f59e0b);
+  box-shadow: 0 0 0 1px var(--accent-color, #f59e0b);
+}
+
+/* Breathing room around the time components, without changing spacing in other forms. */
+.form-group:has(.time-field, .datetime-picker, .choice-group) { margin-block: 0.4rem; }

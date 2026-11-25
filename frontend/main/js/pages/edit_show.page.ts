@@ -1,27 +1,53 @@
-import { invoke } from "@tauri-apps/api/core";
 import { addHoverBox, dynamicGenerator, dynamicPrompt, type ElementDefinition } from "/shared/js/dynamic_generator";
+import "/shared/js/compound_components";
+import { hasFeature } from "/shared/js/platform";
 import { formatScenarioLineDuration, formatScenarioLineTime, resolveScenarioLineStartTimestamp } from "/shared/js/scenario_time";
-import type { ScenarioLine, ScenarioLineComment, ShowDetails, ShowRole } from "/shared/js/show_types";
+import { composeDateTime, decomposeDateTime } from "/shared/js/time_math";
+import { getApi } from "../api";
+import { openShareBox } from "./share_show";
+import { canComment, canEditContent, sortCommentsByRole, type ScenarioLine, type ScenarioLineComment, type ShowDetails, type ShowRole } from "/shared/js/show_types";
 
 type PromptData = NonNullable<Awaited<ReturnType<typeof dynamicPrompt>>>;
 
 let currentBox: ReturnType<typeof addHoverBox> | null = null;
-let currentShowId: number | null = null;
+let currentShowId: string | null = null;
 let currentShowData: ShowDetails | null = null;
-const hiddenRoleIds = new Set<number>();
+const hiddenRoleIds = new Set<string>();
 
 function requireShowData(): ShowDetails {
     if (!currentShowData) throw new Error("No show loaded in the editor.");
     return currentShowData;
 }
 
-async function openEditShow(id: number): Promise<void> {
+function requireShowId(): string {
+    if (currentShowId === null) throw new Error("No show selected in the editor.");
+    return currentShowId;
+}
+
+let stopWatching: (() => void) | null = null;
+
+async function openEditShow(id: string): Promise<void> {
     currentShowId = id;
+    // Re-render when another device or person changes this show (sync, or the live stream).
+    stopWatching?.();
+    stopWatching = getApi().data.subscribe(change => {
+        const open = currentBox !== null && currentBox.container.style.display !== "none";
+        if (!open || (change.showId !== null && change.showId !== currentShowId)) return;
+        // Our own edit already refreshed the sheet; the announcement of it is not news.
+        if (change.rev !== undefined && currentShowData && change.rev <= currentShowData.rev) return;
+        refreshShowData().catch(() => {
+            // The show disappeared (deleted, or access removed): there is nothing left to edit.
+            currentBox?.close();
+            stopWatching?.();
+            stopWatching = null;
+        });
+    });
     await refreshShowData();
 }
 
 async function refreshShowData(): Promise<void> {
-    const data = await invoke<ShowDetails>("get_full_show_details", { showId: currentShowId });
+    if (currentShowId === null) throw new Error("No show selected in the editor.");
+    const data = await getApi().data.getShowDetails(currentShowId);
     currentShowData = data;
 
     // If the box is already open, just refresh its content dynamically
@@ -41,8 +67,9 @@ async function refreshShowData(): Promise<void> {
  * Builds the dynamic definition array for the full screen editor layout
  */
 function buildEditShowLayout(data: ShowDetails): ElementDefinition[] {
-    const formattedDate = new Date(data.show.time * 1000).toLocaleString();
-
+    // What this member may do; the server enforces the same rules, this just hides what would be refused.
+    const role = data.show.role ?? "owner";
+    const mayEdit = canEditContent(role);
     const content: ElementDefinition[] = [
         // Base Layout Containers
         { type: "div", classes: "show-editor-container", varId: "editorContainer" },
@@ -51,13 +78,17 @@ function buildEditShowLayout(data: ShowDetails): ElementDefinition[] {
         // Sidebar: Details Card
         { type: "div", classes: "editor-card", varId: "editorCard", target: "@sidebar" },
         { type: "h3", text: "Show Details", target: "@editorCard" },
-        { type: "p", classes: "show-meta-time", text: formattedDate, target: "@editorCard" },
+        { type: "div", classes: "stat-grid", varId: "stats", target: "@editorCard" },
+        ...showStats(data).flatMap(([label, value]) => [
+            { type: "span", classes: "stat-label", text: label, target: "@stats" },
+            { type: "span", classes: "stat-value", text: value, target: "@stats" }
+        ]),
 
         // Sidebar: Roles Card
         { type: "div", classes: "editor-card", varId: "roleCard", target: "@sidebar" },
         { type: "div", classes: "card-header-flex", varId: "roleCardHeader", target: "@roleCard" },
         { type: "h3", text: "Roles", target: "@roleCardHeader" },
-        { type: "svg", classes: ["btn-icon", "btn-outline-primary"], file: "icons/add.svg", events: { click: addRole }, target: "@roleCardHeader" },
+        ...(mayEdit ? [{ type: "svg", classes: ["btn-icon", "btn-outline-primary"], file: "icons/add.svg", events: { click: addRole }, target: "@roleCardHeader" }] : []),
         { type: "ul", classes: "role-list", varId: "roleCardList", target: "@roleCard" },
 
         // Main Area: Run Sheet
@@ -67,19 +98,22 @@ function buildEditShowLayout(data: ShowDetails): ElementDefinition[] {
 
         // Dedicated flex wrapper for header buttons
         { type: "div", classes: "header-actions-group", varId: "mainHeaderActions", target: "@mainHeader" },
-        { type: "svg", classes: ["btn-icon", "btn-outline-primary"], file: "icons/add.svg", events: { click: addLine }, target: "@mainHeaderActions" },
-        { type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/print.svg", events: { click: openPrintDialog }, target: "@mainHeaderActions" },
+        ...(mayEdit ? [{ type: "svg", classes: ["btn-icon", "btn-outline-primary"], file: "icons/add.svg", events: { click: addLine }, target: "@mainHeaderActions" }] : []),
+        { type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/share.svg", attributes: { title: "Share" }, events: { click: () => openShareBox(data.show.id, data.show.name, role) }, target: "@mainHeaderActions" },
+        ...(hasFeature("print")
+            ? [{ type: "svg", classes: ["btn-icon", "btn-muted"], file: "icons/print.svg", events: { click: openPrintDialog }, target: "@mainHeaderActions" }]
+            : []),
 
         // Table Architecture
         { type: "div", classes: "lines-table-wrapper", varId: "tableWrapper", target: "@main" },
         { type: "table", classes: "lines-table", varId: "table", target: "@tableWrapper" },
         { type: "thead", varId: "tableHeader", target: "@table" },
         { type: "tr", varId: "tableHeaderRow", target: "@tableHeader" },
-        { type: "th", text: "Time", style: { width: "110px" }, target: "@tableHeaderRow" },
-        { type: "th", text: "Cue", style: { width: "160px" }, target: "@tableHeaderRow" },
+        { type: "th", text: "Time", style: { width: "76px" }, target: "@tableHeaderRow" },
+        { type: "th", text: "Cue", style: { width: "20%" }, target: "@tableHeaderRow" },
         { type: "th", text: "Note", target: "@tableHeaderRow" },
-        { type: "th", text: "Comments", style: { width: "250px" }, target: "@tableHeaderRow" },
-        { type: "th", text: "Actions", style: { width: "100px", textAlign: "right" }, target: "@tableHeaderRow" },
+        { type: "th", text: "Comments", style: { width: "34%" }, target: "@tableHeaderRow" },
+        { type: "th", style: { width: "92px" }, target: "@tableHeaderRow" },
         { type: "tbody", varId: "tableBody", target: "@table" }
     ];
 
@@ -111,7 +145,8 @@ function buildEditShowLayout(data: ShowDetails): ElementDefinition[] {
     const lineItems: ElementDefinition[] = data.lines.length > 0
         ? data.lines.flatMap((line, index) => buildLineRow(
             line, data.comments, data.roles,
-            resolveScenarioLineStartTimestamp(data.show.time, data.lines, index)
+            resolveScenarioLineStartTimestamp(data.show.time, data.lines, index),
+            role
         ))
         : [{
             type: "tr",
@@ -120,7 +155,9 @@ function buildEditShowLayout(data: ShowDetails): ElementDefinition[] {
                 type: "td",
                 attributes: { colspan: "5" },
                 classes: "empty-table-cell",
-                text: "No scenario lines added yet. Click '+ Add Line' to start building your run sheet."
+                text: mayEdit
+                ? "No scenario lines added yet. Click '+' above to start building your run sheet."
+                : "Nothing in this run sheet yet."
             }]
         }];
 
@@ -129,15 +166,21 @@ function buildEditShowLayout(data: ShowDetails): ElementDefinition[] {
 }
 
 /**
- * General comments (no role) first, then ascending by role id
+ * Label/value pairs for the sidebar: start, end, total duration and counts
  */
-function sortCommentsByRole(comments: ScenarioLineComment[]): ScenarioLineComment[] {
-    return [...comments].sort((a, b) => {
-        if (a.role_id === null && b.role_id === null) return 0;
-        if (a.role_id === null) return -1;
-        if (b.role_id === null) return 1;
-        return a.role_id - b.role_id;
-    });
+function showStats(data: ShowDetails): [string, string][] {
+    const total = data.lines.reduce((sum, line) => sum + line.duration, 0);
+    const last = data.lines.length - 1;
+    const lastStart = last >= 0 ? resolveScenarioLineStartTimestamp(data.show.time, data.lines, last) : null;
+    const end = lastStart === null ? null : lastStart + data.lines[last].duration;
+    return [
+        ["Date", new Date(data.show.time * 1000).toLocaleDateString()],
+        ["Start", formatScenarioLineTime(data.show.time)],
+        ["End", end === null ? "—" : formatScenarioLineTime(end)],
+        ["Length", formatScenarioLineDuration(total)],
+        ["Cues", String(data.lines.length)],
+        ["Notes", String(data.comments.length)]
+    ];
 }
 
 /**
@@ -147,8 +190,11 @@ function buildLineRow(
     line: ScenarioLine,
     allComments: ScenarioLineComment[],
     allRoles: ShowRole[],
-    startTimestamp: number | null
+    startTimestamp: number | null,
+    role: ShowDetails["show"]["role"] = "owner"
 ): ElementDefinition[] {
+    const mayEdit = canEditContent(role);
+    const mayComment = canComment(role);
     const lineComments = allComments.filter(c => c.line_id === line.id);
 
     const content: ElementDefinition[] = [
@@ -158,15 +204,20 @@ function buildLineRow(
             { type: "div", classes: "duration", text: formatScenarioLineDuration(line.duration) }
         ], target: "@lineRow" },
         { type: "td", classes: "line-content-cell", text: line.name, target: "@lineRow" },
-        { type: "td", classes: "line-note-cell", text: line.comment, target: "@lineRow" },
+        { type: "td", classes: "line-note-cell", text: line.note, target: "@lineRow" },
         { type: "td", classes: "line-comments-cell", varId: "commentsCell", target: "@lineRow" },
         { type: "td", classes: "line-action-cell", varId: "actionCell", target: "@lineRow" },
         { type: "div", classes: "line-action-cell-wrapper", varId: "actionWrapper", target: "@actionCell" },
-        { type: "svg", file: "icons/edit.svg", classes: ["btn-icon", "btn-muted"], target: "@actionWrapper" },
-        { type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-danger"], events: { click: () => deleteLine(line.id) }, target: "@actionWrapper" }
+        ...(mayComment ? [{ type: "svg", file: "icons/add.svg", classes: ["btn-icon", "btn-outline-primary"], attributes: { title: "Add note" }, events: { click: () => addComment(line.id) }, target: "@actionWrapper" }] : []),
+        ...(mayEdit ? [
+            { type: "svg", file: "icons/edit.svg", classes: ["btn-icon", "btn-muted"], target: "@actionWrapper" },
+            { type: "svg", file: "icons/delete.svg", classes: ["btn-icon", "btn-danger"], events: { click: () => deleteLine(line.id) }, target: "@actionWrapper" }
+        ] : [])
     ];
 
-    const notes: ElementDefinition[] = sortCommentsByRole(lineComments).map(comment => {
+    const commentEvents = (comment: ScenarioLineComment): Record<string, EventListener> =>
+        mayComment ? { click: () => { void addComment(comment.line_id, comment.id); } } : {};
+    const notes: ElementDefinition[] = sortCommentsByRole(lineComments, allRoles).map(comment => {
         const assignedRole = allRoles.find(r => r.id === comment.role_id);
         return {
             type: "div",
@@ -177,14 +228,12 @@ function buildLineRow(
                 { type: "span", text: comment.comment, classes: "comment-body-text" }
             ],
             data: { commentRoleId: String(comment.role_id) },
-            style: { cursor: "pointer" },
-            events: { click: () => addComment(comment.line_id, comment.id) }
+            style: { cursor: mayComment ? "pointer" : "default" },
+            events: commentEvents(comment)
         };
     });
 
-    const addNoteBtn: ElementDefinition = { type: "button", classes: ["btn-text-action"], text: "+ Note", events: { click: () => addComment(line.id) }, target: "@commentsCell" };
-
-    return [...content, ...notes, addNoteBtn];
+    return [...content, ...notes];
 }
 
 async function addRole(): Promise<void> {
@@ -203,107 +252,69 @@ async function addRole(): Promise<void> {
 
     if (!newRoleData || !newRoleData.newRoleName) return;
 
-    await invoke("add_role", { showId: currentShowId, roleName: String(newRoleData.newRoleName) });
+    await getApi().data.addRole(requireShowId(), String(newRoleData.newRoleName));
     await refreshShowData();
-}
-
-function numberOptions(count: number): ElementDefinition[] {
-    return Array.from({ length: count }, (_, i) => (
-        { type: "option", attributes: { value: i }, text: String(i).padStart(2, "0") }
-    ));
-}
-
-function toSeconds(hours: PromptData[string], minutes: PromptData[string], seconds: PromptData[string]): number {
-    return (Number(hours) * 3600) + (Number(minutes) * 60) + Number(seconds);
 }
 
 async function addLine(): Promise<void> {
     const showData = requireShowData();
-    const lineCount = showData.lines.length + 1;
-
-    const hours = numberOptions(24);
-    const minutes = numberOptions(60);
-    const seconds = numberOptions(60);
-
-    function toggleAbsoluteTimeSelection(value: string): void {
-        const absoluteTimeSelection = document.getElementById("absoluteTimeSelection");
-        if (!absoluteTimeSelection) return;
-        absoluteTimeSelection.style.display = value === "absolute" ? "flex" : "none";
-    }
+    const lastLine = showData.lines[showData.lines.length - 1];
+    // A fixed start time is a time of day on the show's date; offer the show's own start as the default.
+    const showStartOfDay = decomposeDateTime(showData.show.time).secondsOfDay;
 
     const lineData = await dynamicPrompt({
         title: "Add Scenario Line",
         confirmText: "Add Line",
         elements: [
-            { type: "select-label", label: "Time Mode", id: "startMode", events: { change: (e: Event) => toggleAbsoluteTimeSelection((e.target as HTMLSelectElement).value) }, options: [
-                { type: "option", attributes: { value: "follow" }, text: "After scenario line" },
-                { type: "option", attributes: { value: "absolute" }, text: "Fixed time" }
-            ] },
-
-            { type: "div", classes: "form-group", id: "absoluteTimeSelection", style: { display: "none" } },
-            { type: "label", text: "Start Time", target: "#absoluteTimeSelection" },
-            { type: "div", classes: "form-row-3col", varId: "absoluteTimeRow", target: "#absoluteTimeSelection" },
-            { type: "select-label", label: "Hour", id: "timeUnit", options: hours, target: "@absoluteTimeRow" },
-            { type: "select-label", label: "Minutes", id: "timeMinute", options: minutes, target: "@absoluteTimeRow" },
-            { type: "select-label", label: "Seconds", id: "timeSecond", options: seconds, target: "@absoluteTimeRow" },
-
-            { type: "div", classes: "form-group", varId: "durationGroup" },
-            { type: "label", text: "Duration", target: "@durationGroup" },
-            { type: "div", classes: "form-row-3col", id: "durationRow", target: "@durationGroup" },
-            { type: "select-label", label: "Hour", id: "durationHour", options: hours, target: "#durationRow" },
-            { type: "select-label", label: "Minutes", id: "durationMinute", options: minutes, target: "#durationRow" },
-            { type: "select-label", label: "Seconds", id: "durationSecond", options: seconds, target: "#durationRow" },
-
-            // Full-width main fields (no target -> appended directly to modal body)
-            { type: "input-label", id: "lineName", label: "Cue Name", placeholder: "e.g., Intro Cue" },
-            { type: "textarea-label", id: "lineContent", label: "Cue Description", placeholder: "Enter cue description...", rows: 3 }
+            { type: "input-label", id: "lineName", label: "Cue name", placeholder: "e.g., Intro Cue" },
+            { type: "time-label", id: "duration", label: "Duration", config: { mode: "duration" }, value: 60 },
+            {
+                type: "choice-label", id: "startMode", label: "Starts", value: "follow",
+                config: { options: [{ value: "follow", label: "After the previous cue" }, { value: "absolute", label: "At a fixed time" }] },
+                events: {
+                    change: (event: Event) => {
+                        const group = document.getElementById("startTime-group");
+                        if (group) group.style.display = (event.target as HTMLInputElement).value === "absolute" ? "" : "none";
+                    }
+                }
+            },
+            { type: "time-label", id: "startTime", label: "Start time", config: { mode: "clock" }, value: showStartOfDay, style: { display: "none" } },
+            { type: "textarea-label", id: "lineContent", label: "Cue description", placeholder: "Enter cue description...", rows: 3 }
         ],
         onValidate: data => {
             const errors: Record<string, string> = {};
             const lineName = String(data.lineName);
             if (lineName.length < 5 || lineName.length > 100)
                 errors.lineName = "Cue Name must be between 5 and 100 characters.";
-
-            if (toSeconds(data.durationHour, data.durationMinute, data.durationSecond) === 0)
-                errors.durationRow = "Select the duration of this item";
-
-            if (data.startMode === "absolute" && toSeconds(data.timeUnit, data.timeMinute, data.timeSecond) === 0)
-                errors.absoluteTimeSelection = "Select the absolute start time";
-
+            if (Number(data.duration) === 0) errors.duration = "Select the duration of this item";
             return errors;
         }
     });
 
     if (!lineData) return;
 
-    const duration = toSeconds(lineData.durationHour, lineData.durationMinute, lineData.durationSecond);
+    const duration = Number(lineData.duration);
 
     let absoluteStartTimestamp: number | null = null;
     if (lineData.startMode === "absolute") {
-        const absoluteStartDate = new Date(showData.show.time * 1000);
-        absoluteStartDate.setHours(
-            Number(lineData.timeUnit),
-            Number(lineData.timeMinute),
-            Number(lineData.timeSecond),
-            0
-        );
-        absoluteStartTimestamp = Math.floor(absoluteStartDate.getTime() / 1000);
+        const { date } = decomposeDateTime(showData.show.time);
+        absoluteStartTimestamp = composeDateTime(date, Number(lineData.startTime));
     }
 
     const lineComment = String(lineData.lineContent ?? "").trim() === "" ? " " : String(lineData.lineContent);
 
-    await invoke("add_scenario_line", {
-        showId: currentShowId,
-        lineOrder: lineCount,
+    await getApi().data.addLine({
+        showId: requireShowId(),
+        after: lastLine?.id ?? null,
         lineName: String(lineData.lineName),
-        lineComment,
+        lineNote: lineComment,
         duration,
         absoluteTime: absoluteStartTimestamp
     });
     await refreshShowData();
 }
 
-async function addComment(lineId: number, commentId: number | null = null): Promise<void> {
+async function addComment(lineId: string, commentId: string | null = null): Promise<void> {
     const showData = requireShowData();
     const commentEdit = showData.comments.find(c => c.id === commentId);
     const commentValue = commentEdit?.comment ?? "";
@@ -333,23 +344,23 @@ async function addComment(lineId: number, commentId: number | null = null): Prom
 
     if (!commentData || !commentData.commentText) return;
 
-    const roleId = commentData.roleId ? parseInt(String(commentData.roleId), 10) : null;
+    const roleId = commentData.roleId ? String(commentData.roleId) : null;
     const comment = String(commentData.commentText);
 
     if (commentId) {
-        await invoke("edit_scenario_line_comment", { commentId, roleId, comment });
+        await getApi().data.editComment(requireShowId(), commentId, roleId, comment);
     } else {
-        await invoke("add_scenario_line_comment", { lineId, roleId, comment });
+        await getApi().data.addComment(requireShowId(), lineId, roleId, comment);
     }
     await refreshShowData();
 }
 
-async function deleteLine(id: number): Promise<void> {
-    await invoke("delete_scenario_line", { lineId: id });
+async function deleteLine(id: string): Promise<void> {
+    await getApi().data.deleteLine(requireShowId(), id);
     await refreshShowData();
 }
 
-function toggleRoleVisibility(roleId: number, svgElement: Element): void {
+function toggleRoleVisibility(roleId: string, svgElement: Element): void {
     if (hiddenRoleIds.has(roleId)) {
         hiddenRoleIds.delete(roleId);
         svgElement.classList.remove("is-hidden");
@@ -426,7 +437,7 @@ function generateAndPrintSheet(data: ShowDetails, options: PromptData): void {
             const lineComments = commentsList.filter(c => c.line_id === line.id);
 
             const commentsHtml = lineComments.length > 0
-                ? sortCommentsByRole(lineComments).map(c => {
+                ? sortCommentsByRole(lineComments, data.roles).map(c => {
                     const role = data.roles.find(r => r.id === c.role_id)?.name || "General";
                     const cleanText = (c.comment || '').trim().replaceAll('\n', '<br>');
                     return `<div class="print-comment-card"><span class="print-comment-role">${role}</span><div class="print-comment-text">${cleanText}</div></div>`;
@@ -438,7 +449,7 @@ function generateAndPrintSheet(data: ShowDetails, options: PromptData): void {
                     <td class="col-time"><strong>${formatScenarioLineTime(resolveScenarioLineStartTimestamp(data.show.time, data.lines, index))}</strong></td>
                     <td class="col-duration">${formatScenarioLineDuration(line.duration)}</td>
                     <td class="col-cue"><strong>${line.name || ''}</strong></td>
-                    <td class="col-note">${(line.comment || '').trim().replaceAll('\n', '<br>')}</td>
+                    <td class="col-note">${(line.note || '').trim().replaceAll('\n', '<br>')}</td>
                     <td class="col-comments">${commentsHtml}</td>
                 </tr>
             `;
@@ -485,7 +496,7 @@ function generateAndPrintSheet(data: ShowDetails, options: PromptData): void {
             fullHtml += buildSheetSection(`Role: ${role.name}`, roleComments);
         });
     } else if (options.printMode === "single_role") {
-        const selectedRoleId = Number(options.roleSelect);
+        const selectedRoleId = String(options.roleSelect);
         const role = data.roles.find(r => r.id === selectedRoleId);
         const roleName = role ? role.name : "Role";
 

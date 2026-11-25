@@ -1,6 +1,6 @@
 import { dynamicGenerator, type GeneratedElement } from "/shared/js/dynamic_generator";
 import type { SessionState } from "/shared/js/session_types";
-import type { ShowDetails } from "/shared/js/show_types";
+import { compareLines, type ShowDetails } from "/shared/js/show_types";
 
 export interface TimerParts {
     HH: number;
@@ -41,7 +41,7 @@ export const timerSources: Record<string, TimerSource> = {
     },
     "current-item": (now, { showData, sessionData }) => {
         if (!showData || !sessionData?.current_cue || sessionData.cue_started_at == null) return null;
-        const lines = [...showData.lines].sort((a, b) => a.order - b.order);
+        const lines = [...showData.lines].sort(compareLines);
         const line = lines[sessionData.current_cue - 1];
         if (!line) return null;
         const duration = Number(line.duration);

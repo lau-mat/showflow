@@ -78,7 +78,7 @@ test("countdown warning uses the exact 15-second threshold and clears on reset",
     const app = createContext([{ source: "current-item", format: "MM-SS" }]);
     const start = new RealDate(2026, 9, 25, 9, 5, 3).getTime() / 1000;
     const state = {
-        showData: { lines: [{ order: 1, duration: 60 }] },
+        showData: { lines: [{ position: "a", duration: 60 }] },
         sessionData: { current_cue: 1, cue_started_at: start }
     };
     app.context.startTimers(app.context.document, () => state);
@@ -178,9 +178,9 @@ test("actual show elapsed and item countdown follow live session state, not sche
         showData: {
             show: { time: start - 86400 },
             lines: [
-                { order: 2, duration: 120, absolute_time: start + 3900 },
-                { order: 1, duration: 60, absolute_time: null },
-                { order: 3, duration: 30, absolute_time: null }
+                { position: "b", duration: 120, absolute_time: start + 3900 },
+                { position: "a", duration: 60, absolute_time: null },
+                { position: "c", duration: 30, absolute_time: null }
             ]
         },
         sessionData: { current_cue: 2, show_started_at: start, cue_started_at: start + 3900 }
@@ -214,7 +214,7 @@ test("restored session timestamps preserve elapsed time after a page reload", ()
     ]);
     const now = new RealDate(2026, 9, 25, 9, 5, 3).getTime() / 1000;
     app.context.startTimers(app.context.document, () => ({
-        showData: { lines: [{ order: 1, duration: 60 }] },
+        showData: { lines: [{ position: "a", duration: 60 }] },
         sessionData: { current_cue: 1, show_started_at: now - 90, cue_started_at: now - 15 }
     }));
     assert.equal(app.timers[0].children[1].textContent, "01:30");
@@ -234,7 +234,7 @@ test("item progress drains, turns overdue, and resets on cue changes", () => {
     const app = createContext([{ source: "current-item", label: "Current Item", format: "MM-SS" }]);
     const start = new RealDate(2026, 9, 25, 9, 5, 3).getTime() / 1000;
     const state = {
-        showData: { lines: [{ order: 1, duration: 60 }, { order: 2, duration: 0 }] },
+        showData: { lines: [{ position: "a", duration: 60 }, { position: "b", duration: 0 }] },
         sessionData: { current_cue: 1, cue_started_at: start }
     };
     app.context.startTimers(app.context.document, () => state);

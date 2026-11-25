@@ -19,6 +19,7 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 
 FROM nginx:alpine AS main
+COPY nginx/webapp.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist/main /usr/share/nginx/html
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

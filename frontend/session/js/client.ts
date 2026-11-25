@@ -2,14 +2,14 @@ import { dynamicGenerator, dynamicPrompt, generateDynamic, type ElementDefinitio
 import { formatScenarioLineTime, resolveScenarioLineStartTimestamp } from "/shared/js/scenario_time";
 import { SessionSocket } from "/shared/js/session_socket";
 import type { SessionClient, SessionState } from "/shared/js/session_types";
-import type { ScenarioLine, ShowDetails } from "/shared/js/show_types";
+import { compareLines, type ScenarioLine, type ShowDetails } from "/shared/js/show_types";
 
 const ws = new SessionSocket();
 
 let loginSend = false;
 
 interface ClientSession {
-    roleId: number | null;
+    roleId: string | null;
     userName: string | null;
     clientId: string | null;
     name: string | null;
@@ -108,10 +108,10 @@ async function selectRole(): Promise<void> {
         const { userName, roleId } = joined;
 
         loginSend = true;
-        session.roleId = Number(roleId);
+        session.roleId = String(roleId);
         session.userName = String(userName);
 
-        ws.emit("join_session", { user_name: String(userName), role_id: Number(roleId) });
+        ws.emit("join_session", { user_name: String(userName), role_id: String(roleId) });
     }
 
     buildStructure();
@@ -123,7 +123,7 @@ let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function sortedLines(): ScenarioLine[] {
-    return [...showContent().lines].sort((a, b) => a.order - b.order);
+    return [...showContent().lines].sort(compareLines);
 }
 
 function currentIndex(lines: ScenarioLine[]): number {
@@ -132,7 +132,7 @@ function currentIndex(lines: ScenarioLine[]): number {
     return Math.min(c - 1, lines.length - 1);
 }
 
-function getComment(lineId: number, roleId: number | null): string | null {
+function getComment(lineId: string, roleId: string | null): string | null {
     return (session.showContent?.comments ?? [])
         .find(c => c.line_id === lineId && c.role_id === roleId)?.comment ?? null;
 }
@@ -154,7 +154,7 @@ export function resolveCueStartTimestamp(lines: ScenarioLine[], cueIndex: number
     return resolveScenarioLineStartTimestamp(session.showContent?.show.time, lines, cueIndex);
 }
 
-function noteNodes(lineId: number, small = false): ElementDefinition[] {
+function noteNodes(lineId: string, small = false): ElementDefinition[] {
     const general = getComment(lineId, null);
     const personal = getComment(lineId, session.roleId);
     const nodes: ElementDefinition[] = [];
@@ -228,7 +228,7 @@ function renderCurrentCue(lines: ScenarioLine[]): void {
                 { type: "h2", classes: "ch-cur-title", text: line.name },
                 { type: "span", classes: "ch-cur-time", text: formatCueTime(lines, idx) }
             ] },
-            ...(line.comment ? [{ type: "p", classes: "ch-cur-desc", text: line.comment }] : []),
+            ...(line.note ? [{ type: "p", classes: "ch-cur-desc", text: line.note }] : []),
             ...noteNodes(line.id)
         ]
     }, el);

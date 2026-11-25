@@ -1,4 +1,5 @@
-use crate::{ShowDetails, db, fetch_show_details};
+use crate::{db, store};
+use protocol::show::ShowDetails;
 
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -24,7 +25,7 @@ use local_ip_address::local_ip;
 #[derive(Serialize, Clone, Debug)]
 pub struct Session {
     pub session_id: String,
-    pub show_id: i64,
+    pub show_id: String,
     pub is_active: bool,
     pub current_cue: Option<i64>,
     pub show_started_at: Option<f64>,
@@ -61,7 +62,7 @@ pub struct AppState {
 pub struct Client {
     pub client_id: String,
     pub client_name: Option<String>,
-    pub client_role: Option<i64>,
+    pub client_role: Option<String>,
     #[serde(skip)]
     pub sender: mpsc::UnboundedSender<Message>,
 }
@@ -69,7 +70,7 @@ pub struct Client {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum ClientMessage {
-    JoinSession { user_name: String, role_id: Option<i64>},
+    JoinSession { user_name: String, role_id: Option<String> },
     GetShowData,
     GetSessionData,
     NextCue,
@@ -80,7 +81,7 @@ pub enum ClientMessage {
 #[derive(Serialize, Clone, Debug)]
 #[serde(tag = "command", rename_all = "snake_case")]
 pub enum ServerMessage {
-    JoinSession { client_id: String, client_name: String, client_role: i64 },
+    JoinSession { client_id: String, client_name: String, client_role: String },
     GetShowData { data: ShowDetails },
     GetSessionData { session: Session },
     CueChange {
@@ -145,7 +146,7 @@ async fn handle_client_message(
     message: ClientMessage,
     client: &Client,
     db: &Arc<Mutex<rusqlite::Connection>>,
-    show_id: i64,
+    show_id: &str,
     session: &Arc<Mutex<Option<Session>>>,
     clients: &Arc<Mutex<Vec<Client>>>,
 ) -> MessageResponse {
@@ -183,7 +184,8 @@ async fn handle_client_message(
         }
 
         ClientMessage::GetShowData => {
-            match fetch_show_details(db, show_id) {
+            let details = db.lock().map_err(|e| e.to_string()).and_then(|conn| store::fetch_show_details(&conn, show_id));
+            match details {
                 Ok(show_details) => MessageResponse::Send(ServerMessage::GetShowData { data: show_details }),
                 Err(err) => MessageResponse::Error(format!("Failed to fetch show details: {}", err)),
             }
@@ -297,8 +299,9 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
 }
 
 // remember to call `.manage(MyState::default())`
+#[cfg(desktop)]
 #[tauri::command]
-pub async fn start_session(show_id: i64, state: State<'_, AppState>, db_state: State<'_, db::DbState>, app_handle: AppHandle,) -> Result<String, String> {
+pub async fn start_session(show_id: String, state: State<'_, AppState>, db_state: State<'_, db::DbState>, app_handle: AppHandle,) -> Result<String, String> {
     let mut session_guard = state.session.lock().unwrap();
     if session_guard.is_some() {
         return Err("Session already running".into());
@@ -308,7 +311,7 @@ pub async fn start_session(show_id: i64, state: State<'_, AppState>, db_state: S
     let session_id = uuid::Uuid::new_v4().to_string();
     *session_guard = Some(Session {
         session_id: session_id.clone(),
-        show_id,
+        show_id: show_id.clone(),
         is_active: true,
         current_cue: None,
         show_started_at: None,
@@ -339,6 +342,7 @@ pub async fn start_session(show_id: i64, state: State<'_, AppState>, db_state: S
                     let client_session_id = server_session_id.clone();
                     let db = Arc::clone(&db_arc);
                     let session_for_client = Arc::clone(&session_arc);
+                    let show_id = show_id.clone();
 
                     tokio::spawn(async move {
                         if let Ok(ws_stream) = accept_async(stream).await {
@@ -376,7 +380,7 @@ pub async fn start_session(show_id: i64, state: State<'_, AppState>, db_state: S
                                         };
                                         match serde_json::from_str::<ClientMessage>(&text) {
                                             Ok(msg) => {
-                                                match handle_client_message(msg, &client, &db, show_id, &session_for_client, &clients_arc).await {
+                                                match handle_client_message(msg, &client, &db, &show_id, &session_for_client, &clients_arc).await {
                                                     MessageResponse::Send(resp) => send_json(&mut write, &resp).await,
                                                     MessageResponse::Broadcast(resp) => broadcast_json(&clients_arc, &resp).await,
                                                     MessageResponse::Error(err) => send_error(&mut write, &err).await,
@@ -440,6 +444,7 @@ pub async fn start_session(show_id: i64, state: State<'_, AppState>, db_state: S
     Ok(session_id)
 }
 
+#[cfg(desktop)]
 #[tauri::command]
 pub fn generate_server_qr() -> Result<String, String> {
     let my_local_ip = local_ip().map_err(|e| e.to_string())?;
@@ -454,6 +459,20 @@ pub fn generate_server_qr() -> Result<String, String> {
     Ok(svg_string)
 }
 
+// Mobile apps join sessions but never host one (no show logic), so the commands stay
+// registered but refuse to run.
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn start_session(_show_id: String) -> Result<String, String> {
+    Err("Hosting a session is not available on this platform".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn generate_server_qr() -> Result<String, String> {
+    Err("Sharing a session is not available on this platform".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -462,7 +481,7 @@ mod tests {
     fn cue_timestamps_start_once_and_are_included_in_snapshots_and_broadcasts() {
         let mut session = Session {
             session_id: "test".into(),
-            show_id: 1,
+            show_id: "show".into(),
             is_active: true,
             current_cue: None,
             show_started_at: None,
